@@ -4,6 +4,7 @@ import { PointerLockControls, useTexture } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import {
   landmarks,
@@ -11,6 +12,7 @@ import {
   type WorldBlock,
   worldBlocks,
   worldBounds,
+  worldSky,
   type WorldMaterial,
 } from "@/data/world";
 
@@ -144,6 +146,18 @@ const uniqueTexturePaths = Array.from(
   ),
 );
 
+const uniqueSkyTexturePaths = Array.from(
+  new Set([worldSky.sun.texture, worldSky.moon.texture]),
+);
+
+function configurePixelTexture(texture: THREE.Texture) {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestMipmapNearestFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+}
+
 const groupedWorldBlocks = groupBlocksByMaterial(worldBlocks);
 
 function groupBlocksByMaterial(blocks: WorldBlock[]) {
@@ -165,11 +179,7 @@ function useWorldTextures() {
 
   useEffect(() => {
     textures.forEach((texture) => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestMipmapNearestFilter;
-      texture.generateMipmaps = true;
-      texture.needsUpdate = true;
+      configurePixelTexture(texture);
     });
   }, [textures]);
 
@@ -177,6 +187,462 @@ function useWorldTextures() {
     () =>
       Object.fromEntries(uniqueTexturePaths.map((path, index) => [path, textures[index]])) as Record<string, THREE.Texture>,
     [textures],
+  );
+}
+
+function orbitSkyBody(
+  progress: number,
+  orbitRadius: number,
+  verticalRadius: number,
+  orbitAxis: "x" | "z",
+  heightOffset: number,
+  phaseOffset = 0,
+) {
+  const angle = progress * Math.PI * 2 + phaseOffset;
+  const horizontal = Math.cos(angle) * orbitRadius;
+  const x = orbitAxis === "x" ? horizontal : 0;
+  const z = orbitAxis === "z" ? horizontal : 0;
+
+  return {
+    angle,
+    position: new THREE.Vector3(x, Math.sin(angle) * verticalRadius + heightOffset, z),
+  };
+}
+
+function applyLerpedColor(color: THREE.Color, from: string, to: string, alpha: number) {
+  color.set(from).lerp(new THREE.Color(to), alpha);
+}
+
+function wrapIntoRange(value: number, min: number, max: number) {
+  const range = max - min;
+  if (range <= 0) return min;
+
+  return ((((value - min) % range) + range) % range) + min;
+}
+
+function createCloudBasePositions(
+  count: number,
+  spread: [number, number],
+  minSpacing: number,
+  layerIndex: number,
+) {
+  const spreadX = Math.max(1, Math.abs(spread[0]));
+  const spreadZ = Math.max(1, Math.abs(spread[1]));
+  const positions: Array<[number, number]> = [];
+
+  for (let index = 0; index < count; index += 1) {
+    let bestCandidate: [number, number] | null = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const normalizedX = count === 1 ? 0.5 : (index + attempt / 24) / (count - 1);
+      const candidateX =
+        (normalizedX - 0.5) * spreadX +
+        Math.sin(index * 1.73 + attempt * 0.91 + layerIndex) * spreadX * 0.08;
+      const candidateZ =
+        Math.sin(index * 1.21 + attempt * 0.73 + layerIndex * 0.83) * spreadZ * 0.34 +
+        Math.cos(index * 0.67 + attempt * 0.57 + layerIndex) * spreadZ * 0.14;
+
+      const nearestDistance = positions.reduce((nearest, [x, z]) => {
+        const distance = Math.hypot(candidateX - x, candidateZ - z);
+        return Math.min(nearest, distance);
+      }, Number.POSITIVE_INFINITY);
+      const spacingScore = Math.min(nearestDistance, minSpacing * 1.4);
+      const edgeClearance =
+        Math.min(spreadX * 0.5 - Math.abs(candidateX), spreadZ * 0.5 - Math.abs(candidateZ)) * 0.08;
+      const score = spacingScore + edgeClearance;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = [candidateX, candidateZ];
+      }
+    }
+
+    positions.push(bestCandidate ?? [0, 0]);
+  }
+
+  return positions;
+}
+
+function createCloudVoxelGeometry(width: number, height: number, depth: number, blockSize: number, puffCount: number, seed: number) {
+  const occupied = new Set<string>();
+  const halfWidth = Math.max(2, Math.round(width / blockSize / 2));
+  const halfDepth = Math.max(2, Math.round(depth / blockSize / 2));
+  const halfHeight = Math.max(1, Math.round(height / blockSize / 2));
+
+  for (let puffIndex = 0; puffIndex < puffCount; puffIndex += 1) {
+    const centerX = Math.round(Math.sin(seed * 0.73 + puffIndex * 1.11) * halfWidth * 0.55);
+    const centerY = Math.round(Math.cos(seed * 0.49 + puffIndex * 0.93) * halfHeight * 0.35);
+    const centerZ = Math.round(Math.sin(seed * 0.31 + puffIndex * 0.87) * halfDepth * 0.55);
+    const radiusX = 1 + ((seed + puffIndex) % Math.max(2, halfWidth));
+    const radiusY = (1 + ((seed + puffIndex * 2) % Math.max(2, halfHeight + 1))) / 2;
+    const radiusZ = 1 + ((seed + puffIndex * 3) % Math.max(2, halfDepth));
+
+    for (let x = centerX - radiusX; x <= centerX + radiusX; x += 1) {
+      for (let y = centerY - radiusY; y <= centerY + radiusY; y += 1) {
+        for (let z = centerZ - radiusZ; z <= centerZ + radiusZ; z += 1) {
+          const normalized =
+            ((x - centerX) / (radiusX + 0.35)) ** 2 +
+            ((y - centerY) / (radiusY + 0.35)) ** 2 +
+            ((z - centerZ) / (radiusZ + 0.35)) ** 2;
+          const carveNoise = Math.sin((x + seed) * 1.7) + Math.cos((z - seed) * 1.3) + Math.sin((y + puffIndex) * 1.9);
+
+          if (normalized <= 1.04 && carveNoise > -1.45) {
+            occupied.add(`${x}:${y}:${z}`);
+          }
+        }
+      }
+    }
+  }
+
+  const geometries = Array.from(occupied, (key) => {
+    const [x, y, z] = key.split(":").map(Number);
+    const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+    geometry.translate(x * blockSize, y * blockSize * 0.82, z * blockSize);
+    return geometry;
+  });
+
+  const merged = mergeGeometries(geometries, false);
+  geometries.forEach((geometry) => geometry.dispose());
+
+  if (!merged) {
+    const fallback = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+    fallback.computeVertexNormals();
+    return fallback;
+  }
+
+  merged.computeVertexNormals();
+  return merged;
+}
+
+function SkySystem({
+  ambientLightRef,
+  hemisphereLightRef,
+  directionalLightRef,
+}: {
+  ambientLightRef: { current: THREE.AmbientLight | null };
+  hemisphereLightRef: { current: THREE.HemisphereLight | null };
+  directionalLightRef: { current: THREE.DirectionalLight | null };
+}) {
+  const { camera, scene, clock } = useThree();
+  const skyGroupRef = useRef<THREE.Group>(null);
+  const domeMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const sunMaterialRef = useRef<THREE.SpriteMaterial>(null);
+  const moonMaterialRef = useRef<THREE.SpriteMaterial>(null);
+  const starsMaterialRef = useRef<THREE.PointsMaterial>(null);
+  const cloudLayerRefs = useRef<Array<THREE.Group | null>>([]);
+  const skyTextures = useTexture(uniqueSkyTexturePaths) as THREE.Texture[];
+  const fogRef = useRef(new THREE.Fog(worldSky.colors.dayFog, worldSky.fogNear, worldSky.fogFar));
+  const backgroundColor = useMemo(() => new THREE.Color(worldSky.colors.dayBackground), []);
+  const domeColor = useMemo(() => new THREE.Color(worldSky.colors.dayDome), []);
+  const hemisphereSkyColor = useMemo(() => new THREE.Color(worldSky.lighting.dayHemisphereColor), []);
+  const hemisphereGroundColor = useMemo(() => new THREE.Color(worldSky.lighting.dayGroundColor), []);
+  const directionalColor = useMemo(() => new THREE.Color(worldSky.lighting.sunColor), []);
+
+  const texturesByPath = useMemo(
+    () =>
+      Object.fromEntries(uniqueSkyTexturePaths.map((path, index) => [path, skyTextures[index]])) as Record<string, THREE.Texture>,
+    [skyTextures],
+  );
+
+  const cloudMaterials = useMemo(
+    () =>
+      worldSky.cloudLayers.map(
+        () =>
+          new THREE.MeshStandardMaterial({
+            color: "#ffffff",
+            roughness: 1,
+            metalness: 0,
+            fog: false,
+            transparent: false,
+            depthWrite: true,
+            flatShading: true,
+          }),
+      ),
+    [],
+  );
+
+  const cloudBlobs = useMemo(
+    () =>
+      worldSky.cloudLayers.map((layer, layerIndex) =>
+        createCloudBasePositions(
+          layer.count,
+          layer.spread,
+          layer.minSpacing ?? Math.max(layer.size[0], layer.size[2]) * 2,
+          layerIndex,
+        ).map(([baseX, baseZ], index) => {
+          const sizeScale = 1 + Math.sin(index * 1.17 + layerIndex) * 0.18;
+          const heightScale = 1 + Math.cos(index * 1.33 + layerIndex) * 0.14;
+          const depthScale = 1 + Math.sin(index * 0.91 + layerIndex * 0.8) * 0.16;
+          const width = layer.size[0] * sizeScale;
+          const cloudHeight = layer.size[1] * heightScale;
+          const depth = layer.size[2] * depthScale;
+
+          return {
+            key: `${layerIndex}-${index}`,
+            basePosition: [
+              baseX,
+              layer.height + Math.sin(index * 1.91 + layerIndex) * 3.5,
+              baseZ,
+            ] as [number, number, number],
+            rotation: [
+              Math.sin(index * 0.67 + layerIndex) * 0.08,
+              Math.sin(index * 0.53 + layerIndex * 0.6) * 0.18,
+              Math.cos(index * 0.59 + layerIndex) * 0.05,
+            ] as [number, number, number],
+            bobPhase: index * 0.71 + layerIndex * 0.93,
+            geometry: createCloudVoxelGeometry(width, cloudHeight, depth, layer.blockSize, layer.puffCount, index + layerIndex * 17),
+          };
+        }),
+      ),
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      cloudBlobs.forEach((layer) => {
+        layer.forEach((cloud) => {
+          cloud.geometry.dispose();
+        });
+      });
+
+      cloudMaterials.forEach((material) => {
+        material.dispose();
+      });
+    },
+    [cloudBlobs, cloudMaterials],
+  );
+
+  const starPositions = useMemo(() => {
+    const values = new Float32Array(worldSky.stars.count * 3);
+
+    for (let index = 0; index < worldSky.stars.count; index += 1) {
+      const theta = (index / worldSky.stars.count) * Math.PI * 2 + Math.sin(index * 0.73) * 0.3;
+      const phi = 0.35 + (index % 9) * 0.075;
+      const radius = worldSky.stars.radius + Math.sin(index * 1.17) * 4;
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.cos(phi);
+      const z = radius * Math.sin(phi) * Math.sin(theta);
+
+      values.set([x, y, z], index * 3);
+    }
+
+    return values;
+  }, []);
+
+  useEffect(() => {
+    skyTextures.forEach((texture) => {
+      configurePixelTexture(texture);
+    });
+  }, [skyTextures]);
+
+  useEffect(() => {
+    scene.background = backgroundColor;
+    scene.fog = fogRef.current;
+
+    return () => {
+      scene.fog = null;
+    };
+  }, [backgroundColor, scene]);
+
+  useFrame(() => {
+    if (!skyGroupRef.current) return;
+
+    skyGroupRef.current.position.copy(camera.position);
+
+    const cycleProgress = worldSky.cycle.enabled
+      ? (worldSky.cycle.startProgress + clock.getElapsedTime() / worldSky.cycle.secondsPerDay) % 1
+      : worldSky.cycle.startProgress;
+
+    const sunOrbit = orbitSkyBody(
+      cycleProgress,
+      worldSky.sun.orbitRadius,
+      worldSky.sun.verticalRadius,
+      worldSky.orbit.axis,
+      worldSky.orbit.heightOffset,
+    );
+    const moonOrbit = orbitSkyBody(
+      cycleProgress,
+      worldSky.moon.orbitRadius,
+      worldSky.moon.verticalRadius,
+      worldSky.orbit.axis,
+      worldSky.orbit.heightOffset,
+      Math.PI,
+    );
+
+    const daylightBase = THREE.MathUtils.clamp((Math.sin(sunOrbit.angle) + 0.18) / 1.18, 0, 1);
+    const daylight = THREE.MathUtils.smoothstep(daylightBase, 0, 1);
+    const night = 1 - daylight;
+
+    const sunSprite = skyGroupRef.current.getObjectByName("sky-sun");
+    const moonSprite = skyGroupRef.current.getObjectByName("sky-moon");
+    if (sunSprite) sunSprite.position.copy(sunOrbit.position);
+    if (moonSprite) moonSprite.position.copy(moonOrbit.position);
+
+    skyGroupRef.current.rotation.y = camera.rotation.y * 0.08;
+
+    cloudLayerRefs.current.forEach((layerGroup, index) => {
+      if (!layerGroup) return;
+
+      const layer = worldSky.cloudLayers[index];
+      const spreadX = Math.max(1, Math.abs(layer.spread[0]));
+      const spreadZ = Math.max(1, Math.abs(layer.spread[1]));
+      const driftX = layer.driftDirection[0] * layer.driftSpeed * clock.getElapsedTime();
+      const driftZ = layer.driftDirection[1] * layer.driftSpeed * clock.getElapsedTime();
+
+      layerGroup.position.set(
+        wrapIntoRange(driftX, -spreadX * 0.5, spreadX * 0.5),
+        0,
+        wrapIntoRange(driftZ, -spreadZ * 0.5, spreadZ * 0.5),
+      );
+    });
+
+    applyLerpedColor(backgroundColor, worldSky.colors.nightBackground, worldSky.colors.dayBackground, daylight);
+    applyLerpedColor(fogRef.current.color, worldSky.colors.nightFog, worldSky.colors.dayFog, daylight);
+    applyLerpedColor(domeColor, worldSky.colors.nightDome, worldSky.colors.dayDome, daylight);
+    domeMaterialRef.current?.color.copy(domeColor);
+
+    if (sunMaterialRef.current) {
+      sunMaterialRef.current.opacity = THREE.MathUtils.lerp(0.18, 1, daylight);
+    }
+
+    if (moonMaterialRef.current) {
+      moonMaterialRef.current.opacity = THREE.MathUtils.lerp(0.08, 0.95, night);
+    }
+
+    if (starsMaterialRef.current) {
+      starsMaterialRef.current.opacity = THREE.MathUtils.lerp(0, 0.85, night);
+    }
+
+    cloudMaterials.forEach((material) => {
+      if (!material) return;
+
+      material.color.set(worldSky.colors.nightFog).lerp(new THREE.Color("#ffffff"), daylight * 0.88);
+      material.emissive.set(worldSky.colors.nightFog).lerp(new THREE.Color("#ffffff"), daylight * 0.1);
+      material.emissiveIntensity = THREE.MathUtils.lerp(0.04, 0.12, daylight);
+    });
+
+    if (ambientLightRef.current) {
+      ambientLightRef.current.intensity = THREE.MathUtils.lerp(
+        worldSky.lighting.nightAmbient,
+        worldSky.lighting.dayAmbient,
+        daylight,
+      );
+    }
+
+    if (hemisphereLightRef.current) {
+      hemisphereLightRef.current.intensity = THREE.MathUtils.lerp(
+        worldSky.lighting.nightHemisphere,
+        worldSky.lighting.dayHemisphere,
+        daylight,
+      );
+      applyLerpedColor(
+        hemisphereSkyColor,
+        worldSky.lighting.nightHemisphereColor,
+        worldSky.lighting.dayHemisphereColor,
+        daylight,
+      );
+      applyLerpedColor(
+        hemisphereGroundColor,
+        worldSky.lighting.nightGroundColor,
+        worldSky.lighting.dayGroundColor,
+        daylight,
+      );
+      hemisphereLightRef.current.color.copy(hemisphereSkyColor);
+      hemisphereLightRef.current.groundColor.copy(hemisphereGroundColor);
+    }
+
+    if (directionalLightRef.current) {
+      directionalLightRef.current.intensity = THREE.MathUtils.lerp(
+        worldSky.lighting.nightDirectional,
+        worldSky.lighting.dayDirectional,
+        daylight,
+      );
+      applyLerpedColor(directionalColor, worldSky.lighting.moonColor, worldSky.lighting.sunColor, daylight);
+      directionalLightRef.current.color.copy(directionalColor);
+      directionalLightRef.current.position.copy(sunOrbit.position.clone().normalize().multiplyScalar(42));
+    }
+  });
+
+  return (
+    <>
+      <group ref={skyGroupRef}>
+        <mesh frustumCulled={false} renderOrder={-20}>
+          <sphereGeometry args={[worldSky.domeRadius, 24, 24]} />
+          <meshBasicMaterial ref={domeMaterialRef} color={worldSky.colors.dayDome} side={THREE.BackSide} fog={false} depthWrite={false} />
+        </mesh>
+
+        <points frustumCulled={false} renderOrder={-18}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[starPositions, 3]} />
+          </bufferGeometry>
+          <pointsMaterial
+            ref={starsMaterialRef}
+            color="#f8fbff"
+            size={worldSky.stars.size}
+            sizeAttenuation
+            transparent
+            opacity={0}
+            fog={false}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </points>
+
+        <sprite name="sky-sun" scale={worldSky.sun.scale} renderOrder={10}>
+          <spriteMaterial
+            ref={sunMaterialRef}
+            map={texturesByPath[worldSky.sun.texture]}
+            transparent
+            alphaTest={0.1}
+            fog={false}
+            depthWrite={false}
+            depthTest
+            toneMapped={false}
+          />
+        </sprite>
+
+        <sprite name="sky-moon" scale={worldSky.moon.scale} renderOrder={11}>
+          <spriteMaterial
+            ref={moonMaterialRef}
+            map={texturesByPath[worldSky.moon.texture]}
+            transparent
+            alphaTest={0.1}
+            fog={false}
+            depthWrite={false}
+            depthTest
+            toneMapped={false}
+            opacity={0.1}
+          />
+        </sprite>
+      </group>
+
+      {worldSky.cloudLayers.map((layer, layerIndex) => (
+        <group
+          key={`cloud-layer-${layerIndex}`}
+          ref={(node) => {
+            cloudLayerRefs.current[layerIndex] = node;
+          }}
+          renderOrder={6 + layerIndex}
+        >
+          {cloudBlobs[layerIndex].map((cloud) => (
+            <mesh
+              key={cloud.key}
+              geometry={cloud.geometry}
+              material={cloudMaterials[layerIndex]}
+              position={[
+                cloud.basePosition[0],
+                cloud.basePosition[1] + Math.sin(cloud.bobPhase) * layer.bobAmplitude,
+                cloud.basePosition[2],
+              ]}
+              rotation={cloud.rotation}
+              castShadow
+              receiveShadow
+            />
+          ))}
+        </group>
+      ))}
+    </>
   );
 }
 
@@ -400,6 +866,9 @@ export default function GameScene() {
   const [targetLabel, setTargetLabel] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<InteractionId | null>(null);
   const [locked, setLocked] = useState(false);
+  const ambientLightRef = useRef<THREE.AmbientLight>(null);
+  const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
+  const directionalLightRef = useRef<THREE.DirectionalLight>(null);
 
   const onTarget = useCallback((id: InteractionId | null, label: string | null) => {
     setTarget(id);
@@ -422,12 +891,26 @@ export default function GameScene() {
   return (
     <div className="scene-shell">
       <Canvas camera={{ fov: 70 }} shadows>
-        <color attach="background" args={["#a7cfff"]} />
-        <fog attach="fog" args={["#a7cfff", 18, 54]} />
-        <ambientLight intensity={0.9} />
-        <hemisphereLight intensity={0.45} color="#fdf3c3" groundColor="#4c5b38" />
-        <directionalLight intensity={1.25} position={[9, 12, 4]} castShadow />
+        <ambientLight ref={ambientLightRef} intensity={worldSky.lighting.dayAmbient} />
+        <hemisphereLight
+          ref={hemisphereLightRef}
+          intensity={worldSky.lighting.dayHemisphere}
+          color={worldSky.lighting.dayHemisphereColor}
+          groundColor={worldSky.lighting.dayGroundColor}
+        />
+        <directionalLight
+          ref={directionalLightRef}
+          intensity={worldSky.lighting.dayDirectional}
+          position={[9, 12, 4]}
+          color={worldSky.lighting.sunColor}
+          castShadow
+        />
 
+        <SkySystem
+          ambientLightRef={ambientLightRef}
+          hemisphereLightRef={hemisphereLightRef}
+          directionalLightRef={directionalLightRef}
+        />
         <VoxelWorld />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />

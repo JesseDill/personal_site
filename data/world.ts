@@ -36,6 +36,89 @@ export const worldBounds = {
   maxZ: 8,
 };
 
+export const worldSky = {
+  fogNear: 18,
+  fogFar: 54,
+  domeRadius: 160,
+  cycle: {
+    enabled: true,
+    secondsPerDay: 150,
+    startProgress: 0.22,
+  },
+  orbit: {
+    axis: "z" as const,
+    heightOffset: 12,
+  },
+  colors: {
+    dayBackground: "#a7cfff",
+    nightBackground: "#0d1730",
+    dayFog: "#a7cfff",
+    nightFog: "#18284d",
+    dayDome: "#9ecfff",
+    nightDome: "#142345",
+  },
+  lighting: {
+    dayAmbient: 0.9,
+    nightAmbient: 0.18,
+    dayHemisphere: 0.45,
+    nightHemisphere: 0.14,
+    dayDirectional: 1.25,
+    nightDirectional: 0.12,
+    dayHemisphereColor: "#fdf3c3",
+    nightHemisphereColor: "#5e70a6",
+    dayGroundColor: "#4c5b38",
+    nightGroundColor: "#172114",
+    sunColor: "#fff3c4",
+    moonColor: "#b7cbff",
+  },
+  sun: {
+    texture: "/textures/sky/minecraft-sun.svg",
+    scale: [12, 12, 1] as [number, number, number],
+    orbitRadius: 92,
+    verticalRadius: 44,
+  },
+  moon: {
+    texture: "/textures/sky/minecraft-moon.svg",
+    scale: [9, 9, 1] as [number, number, number],
+    orbitRadius: 84,
+    verticalRadius: 38,
+  },
+  cloudLayers: [
+    {
+      count: 1,
+      height: 122,
+      size: [12, 6, 9] as [number, number, number],
+      spread: [150, 90] as [number, number],
+      driftDirection: [1, 0.14] as [number, number],
+      driftSpeed: 2.4,
+      bobAmplitude: 0.45,
+      opacity: 0.5,
+      puffCount: 11,
+      blockSize: 10.1,
+      minSpacing: 42,
+    },
+    {
+      count: 2,
+      height: 120,
+      size: [16, 7, 11] as [number, number, number],
+      spread: [184, 110] as [number, number],
+      driftDirection: [1, -0.08] as [number, number],
+      driftSpeed: 1.35,
+      bobAmplitude: 0.32,
+      opacity: 0.5,
+      puffCount: 8,
+      blockSize: 10.5,
+      minSpacing: 64,
+    },
+
+  ],
+  stars: {
+    count: 42,
+    radius: 112,
+    size: 0.85,
+  },
+};
+
 export const landmarks: Landmark[] = [
   { id: "about", position: [0, 0.75, -5], label: "Open Spawn Cabin", subtitle: "About", accent: "aboutAccent" },
   { id: "resume", position: [0, 0.75, -11], label: "Open Resume Keep", subtitle: "Resume", accent: "resumeAccent" },
@@ -256,9 +339,9 @@ function buildWorldBlocks() {
   addTree(blocks, -10, -24);
   addTree(blocks, 10, -24);
 
-  addCloud(blocks, -12, -6);
-  addCloud(blocks, 5, -17);
-  addCloud(blocks, 10, -8);
+  // addCloud(blocks, -12, -6);
+  // addCloud(blocks, 5, -17);
+  // addCloud(blocks, 10, -8);
 
   addPerimeterWalls(blocks);
 
