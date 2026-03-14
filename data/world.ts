@@ -62,6 +62,72 @@ export const landmarks: Landmark[] = [
   },
 ];
 
+type TerrainZone = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+};
+
+const flatTerrainZones: TerrainZone[] = [
+  { minX: -5, maxX: 5, minZ: -8, maxZ: 8 },
+  { minX: -2, maxX: 2, minZ: -23, maxZ: 7 },
+  { minX: 0, maxX: 10, minZ: -14, maxZ: -10 },
+  { minX: -10, maxX: 0, minZ: -16, maxZ: -12 },
+  { minX: -4, maxX: 4, minZ: -23, maxZ: -17 },
+];
+
+function isInsideZone(x: number, z: number, zone: TerrainZone) {
+  return x >= zone.minX && x <= zone.maxX && z >= zone.minZ && z <= zone.maxZ;
+}
+
+function shouldKeepTerrainFlat(x: number, z: number) {
+  if (flatTerrainZones.some((zone) => isInsideZone(x, z, zone))) {
+    return true;
+  }
+
+  return landmarks.some((landmark) => Math.abs(landmark.position[0] - x) <= 2 && Math.abs(landmark.position[2] - z) <= 2);
+}
+
+function terrainLevelsAt(x: number, z: number) {
+  if (shouldKeepTerrainFlat(x, z)) {
+    return 0;
+  }
+
+  const edgeBias = Number(Math.abs(x) >= 10) + Number(z <= -17) + Number(z >= 2);
+  if (edgeBias === 0) {
+    return 0;
+  }
+
+  const contour = Math.sin(x * 0.55) + Math.cos(z * 0.4) + Math.sin((x - z) * 0.28);
+  let levels = contour > 0.25 ? 1 : 0;
+
+  if (edgeBias >= 2 && contour > 1.1) {
+    levels = 2;
+  }
+
+  if ((Math.abs(x) >= 14 || z <= -23) && contour > -0.15) {
+    levels = Math.max(levels, 1);
+  }
+
+  return levels;
+}
+
+function addTerrainColumn(blocks: WorldBlock[], x: number, z: number) {
+  const material: WorldMaterial = (x + z) % 2 === 0 ? "grass" : "grassShade";
+  const levels = terrainLevelsAt(x, z);
+
+  blocks.push({ position: [x, -0.5, z], material });
+
+  for (let level = 1; level <= levels; level += 1) {
+    blocks.push({
+      position: [x, -0.5 + level, z],
+      material,
+      solid: true,
+    });
+  }
+}
+
 function addRect(
   blocks: WorldBlock[],
   minX: number,
@@ -163,10 +229,7 @@ function buildWorldBlocks() {
 
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     for (let z = worldBounds.minZ; z <= worldBounds.maxZ; z += 1) {
-      blocks.push({
-        position: [x, -0.5, z],
-        material: (x + z) % 2 === 0 ? "grass" : "grassShade",
-      });
+      addTerrainColumn(blocks, x, z);
     }
   }
 
