@@ -15,7 +15,7 @@
   --hotbar-gap: 0.35rem;
   --hotbar-slot-size: 3.0rem;
   --hotbar-slot-padding: 0.26rem;
-  --hotbar-icon-size: 28px;
+  --hotbar-icon-size: 30px;
   --hotbar-count-right: 0.18rem;
   --hotbar-count-bottom: 0.14rem;
   --hotbar-selected-lift: -4px;
@@ -291,9 +291,17 @@ a {
     inset -2px -2px 0 rgba(15, 18, 24, 0.14);
 }
 
-.collected-slot-icon {
+.collected-slot-voxel {
+  position: relative;
   width: var(--hotbar-icon-size);
   height: var(--hotbar-icon-size);
+  display: block;
+}
+
+.collected-slot-voxel-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
   image-rendering: pixelated;
 }
 

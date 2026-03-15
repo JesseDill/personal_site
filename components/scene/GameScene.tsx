@@ -430,16 +430,74 @@ type DroppedBlockItem = {
 const collectedInventoryConfig = {
   dirt: {
     label: "Dirt",
-    icon: "/textures/world/dirt.svg",
+    faceTextures: cubeFaceOrder.map((face) => faceTexturePaths.dirt[face]),
   },
   wood: {
     label: "Log",
-    icon: faceTexturePaths.wood.front,
+    faceTextures: cubeFaceOrder.map((face) => faceTexturePaths.wood[face]),
   },
-} satisfies Record<DroppedBlockItem["material"], { label: string; icon: string }>;
+} satisfies Record<DroppedBlockItem["material"], { label: string; faceTextures: string[] }>;
 
 const collectedInventoryMaterials = Object.keys(collectedInventoryConfig) as DroppedBlockItem["material"][];
 const hotbarSlotCount = 9;
+
+function InventoryVoxelIcon({ material }: { material: DroppedBlockItem["material"] }) {
+  const config = collectedInventoryConfig[material];
+
+  return (
+    <span className="collected-slot-voxel" role="img" aria-label={config.label}>
+      <Canvas
+        className="collected-slot-voxel-canvas"
+        orthographic
+        frameloop="demand"
+        camera={{ position: [2.6, 2.3, 2.6], zoom: 24 }}
+        dpr={[1, 1.5]}
+        gl={{ alpha: true, antialias: false }}
+      >
+        <InventoryVoxelPreviewScene texturePaths={config.faceTextures} />
+      </Canvas>
+    </span>
+  );
+}
+
+function InventoryVoxelPreviewScene({ texturePaths }: { texturePaths: string[] }) {
+  const textures = useTexture(texturePaths) as THREE.Texture[];
+
+  useEffect(() => {
+    textures.forEach((texture) => {
+      configurePixelTexture(texture);
+    });
+  }, [textures]);
+
+  return (
+    <>
+      <ambientLight intensity={1.35} />
+      <directionalLight position={[3, 4, 5]} intensity={1.1} />
+      {/* Hotbar voxel preview cheat sheet:
+          camera.position[0] / x: orbit view left-right around the block
+          camera.position[1] / y: raise or lower the viewing angle to show more or less of the top face
+          camera.position[2] / z: push the camera around the diagonal; usually change with x for a balanced view
+          camera.zoom: make the block appear larger or smaller inside the slot
+          rotation[0] / x: tilt the block to expose more or less of the top face
+          rotation[1] / y: turn the block to favor the left or right side
+          rotation[2] / z: roll the block for a stylized slant, usually keep near 0 */}
+      <mesh rotation={[0.0, 0.0, 0]} scale={0.9}>
+        <boxGeometry args={[1, 1, 1]} />
+        {textures.map((texture, index) => (
+          <meshStandardMaterial
+            key={`inventory-voxel-${index}-${texture.uuid}`}
+            attach={`material-${index}`}
+            map={texture}
+            color="#ffffff"
+            roughness={1}
+            metalness={0}
+            toneMapped={false}
+          />
+        ))}
+      </mesh>
+    </>
+  );
+}
 
 function getCenterTerrainHit(raycaster: THREE.Raycaster, camera: THREE.Camera, scene: THREE.Scene, maxDistance: number) {
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -2163,11 +2221,7 @@ export default function GameScene() {
               >
                 {material ? (
                   <>
-                    <img
-                      className="collected-slot-icon"
-                      src={collectedInventoryConfig[material].icon}
-                      alt={collectedInventoryConfig[material].label}
-                    />
+                    <InventoryVoxelIcon material={material} />
                     <span className="collected-slot-count">{collectedInventory[material]}</span>
                   </>
                 ) : (
