@@ -59,6 +59,7 @@ const materialPalette = {
   },
   dirt: { textures: { all: "/textures/world/dirt.svg" }, uiColor: "#8b6541", roughness: 1 },
   bedrock: { textures: { all: "/textures/world/bedrock.svg" }, uiColor: "#52565c", roughness: 1 },
+  signStone: { textures: { all: "/textures/world/sign-stone.svg" }, uiColor: "#8b8f98", roughness: 0.92 },
   path: { textures: { all: "/textures/world/path.svg" }, uiColor: "#b89b6f", roughness: 0.96 },
   stone: { textures: { all: "/textures/world/stone.svg" }, uiColor: "#9f9380", roughness: 1 },
   stoneDark: { textures: { all: "/textures/world/stone-dark.svg" }, uiColor: "#5f5a54", roughness: 1 },
@@ -216,6 +217,7 @@ const blockBreakHitsRequired = {
   grassShade: 4,
   dirt: 4,
   bedrock: Number.MAX_SAFE_INTEGER,
+  signStone: 10,
   path: 5,
   stone: 8,
   stoneDark: 9,
@@ -228,7 +230,7 @@ const blockBreakHitsRequired = {
   contactAccent: 10,
 } satisfies Record<Exclude<WorldMaterial, "cloud">, number>;
 
-const unbreakableTerrainMaterials = new Set<Exclude<WorldMaterial, "cloud">>(["bedrock"]);
+const unbreakableTerrainMaterials = new Set<Exclude<WorldMaterial, "cloud">>(["bedrock", "stoneDark", "signStone"]);
 
 const playerCollisionConfig = {
   radius: 0.34,
@@ -238,6 +240,9 @@ const playerCollisionConfig = {
   stepHeight: 0.65,
   groundSnapDistance: 0.18,
 } as const;
+
+const playerSpawnPosition: [number, number, number] = [0, playerCollisionConfig.eyeHeight + 1, 2.5];
+const playerSpawnRotation: [number, number, number] = [0, Math.PI, 0];
 
 const blockedInteractionCells = new Set(landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`));
 
@@ -1971,7 +1976,15 @@ function PlayerController({
   const gravity = 22;
 
   useEffect(() => {
-    camera.position.set(0, playerCollisionConfig.eyeHeight + 1, 5.5);
+    /* Spawn pose cheat sheet:
+       playerSpawnPosition[0] / x: move the starting camera left or right
+       playerSpawnPosition[1] / y: raise or lower the starting eye height
+       playerSpawnPosition[2] / z: move the starting camera forward or backward
+       playerSpawnRotation[0] / x: tilt the starting view up or down
+       playerSpawnRotation[1] / y: rotate the starting view left or right
+       playerSpawnRotation[2] / z: roll the camera; usually keep this at 0 */
+    camera.position.set(...playerSpawnPosition);
+    camera.rotation.set(...playerSpawnRotation);
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
@@ -2009,7 +2022,8 @@ function PlayerController({
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
-    camera.position.y = playerCollisionConfig.eyeHeight + 1;
+    camera.position.set(...playerSpawnPosition);
+    camera.rotation.set(...playerSpawnRotation);
   }, [camera, enabled, onMovingChange]);
 
   useFrame((_state, delta) => {

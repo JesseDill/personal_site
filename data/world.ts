@@ -5,6 +5,7 @@ export type WorldMaterial =
   | "grassShade"
   | "dirt"
   | "bedrock"
+  | "signStone"
   | "path"
   | "stone"
   | "stoneDark"
@@ -309,6 +310,23 @@ function addPerimeterWalls(blocks: WorldBlock[]) {
   }
 }
 
+function addSpawnBillboard(blocks: WorldBlock[]) {
+  // A framed rear wall behind the spawn that can later host text/items.
+  addRect(blocks, -4, 4, 7, 7, 0.5, "signStone", true);
+
+  // addColumn(blocks, -4, 7, 5, 1.5, "stoneDark");
+  // addColumn(blocks, 4, 7, 5, 1.5, "stoneDark");
+
+  // addRect(blocks, -3, 3, 7, 7, 5.5, "stoneDark", true);
+  addRect(blocks, -2, 2, 7, 7, 1.5, "signStone", true);
+  addRect(blocks, -2, 2, 7, 7, 2.5, "signStone", true);
+  addRect(blocks, -2, 2, 7, 7, 3.5, "signStone", true);
+  addRect(blocks, -2, 2, 7, 7, 4.5, "signStone", true);
+
+  // blocks.push({ position: [-3, 4.5, 7], material: "stoneDark", solid: true });
+  // blocks.push({ position: [3, 4.5, 7], material: "stoneDark", solid: true });
+}
+
 function buildWorldBlocks() {
   const blocks: WorldBlock[] = [];
   const verticalOffset = 1;
@@ -349,6 +367,7 @@ function buildWorldBlocks() {
   // addCloud(blocks, 10, -8);
 
   addPerimeterWalls(blocks);
+  addSpawnBillboard(blocks);
 
   const dedupedBlocks = new Map<string, WorldBlock>();
 
