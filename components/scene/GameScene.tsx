@@ -201,6 +201,29 @@ const terrainImpactConfig = {
   angularVelocity: 8,
 } as const;
 
+const blockBreakTexturePaths = [
+  "/textures/world/block-break-stage-1.svg",
+  "/textures/world/block-break-stage-2.svg",
+  "/textures/world/block-break-stage-3.svg",
+  "/textures/world/block-break-stage-4.svg",
+  "/textures/world/block-break-stage-5.svg",
+] as const;
+
+const blockBreakHitsRequired = {
+  grass: 4,
+  grassShade: 4,
+  path: 5,
+  stone: 8,
+  stoneDark: 9,
+  wood: 6,
+  leaves: 2,
+  aboutAccent: 10,
+  resumeAccent: 10,
+  projectsAccent: 10,
+  researchAccent: 10,
+  contactAccent: 10,
+} satisfies Record<Exclude<WorldMaterial, "cloud">, number>;
+
 const playerCollisionConfig = {
   radius: 0.34,
   height: 1.8,
@@ -212,10 +235,13 @@ const playerCollisionConfig = {
 
 const blockedInteractionCells = new Set(landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`));
 
+let activeRemovedTerrainBlockKeys = new Set<string>();
+
 const solidColumns = worldBlocks.reduce(
   (columns, block) => {
     if (!block.solid) return columns;
 
+    const blockKey = `${block.position[0]}:${block.position[1]}:${block.position[2]}`;
     const key = `${Math.round(block.position[0])}:${Math.round(block.position[2])}`;
     const segments = columns.get(key) ?? [];
     segments.push({
@@ -223,11 +249,12 @@ const solidColumns = worldBlocks.reduce(
       top: block.position[1] + 0.5,
       cellX: Math.round(block.position[0]),
       cellZ: Math.round(block.position[2]),
+      blockKey,
     });
     columns.set(key, segments);
     return columns;
   },
-  new Map<string, Array<{ bottom: number; top: number; cellX: number; cellZ: number }>>(),
+  new Map<string, Array<{ bottom: number; top: number; cellX: number; cellZ: number; blockKey: string }>>(),
 );
 
 function getOccupiedCellRange(center: number, radius: number) {
@@ -259,6 +286,7 @@ function getHighestSupportBelow(x: number, feetY: number, z: number) {
       if (!column) continue;
 
       column.forEach((segment) => {
+        if (activeRemovedTerrainBlockKeys.has(segment.blockKey)) return;
         if (segment.top <= feetY + 0.001) {
           highestSupport = Math.max(highestSupport, segment.top);
         }
@@ -297,7 +325,7 @@ function canPlayerOccupyPosition(x: number, feetY: number, z: number) {
       const column = solidColumns.get(`${cellX}:${cellZ}`);
       if (!column) continue;
 
-      if (column.some((segment) => segment.top > bodyBottom && segment.bottom < bodyTop)) {
+      if (column.some((segment) => !activeRemovedTerrainBlockKeys.has(segment.blockKey) && segment.top > bodyBottom && segment.bottom < bodyTop)) {
         return false;
       }
     }
@@ -319,6 +347,7 @@ function findStepUpHeight(x: number, currentFeetY: number, z: number) {
       if (!column) continue;
 
       column.forEach((segment) => {
+        if (activeRemovedTerrainBlockKeys.has(segment.blockKey)) return;
         const stepHeight = segment.top - currentFeetY;
         if (stepHeight <= 0.001 || stepHeight > playerCollisionConfig.stepHeight) {
           return;
@@ -351,6 +380,7 @@ function resolveUpwardFeetPosition(x: number, currentFeetY: number, targetFeetY:
       if (!column) continue;
 
       column.forEach((segment) => {
+        if (activeRemovedTerrainBlockKeys.has(segment.blockKey)) return;
         if (
           segment.bottom >= currentFeetY + playerCollisionConfig.height - 0.001 &&
           segment.bottom < targetFeetY + playerCollisionConfig.height
@@ -376,7 +406,83 @@ function configurePixelTexture(texture: THREE.Texture) {
   texture.needsUpdate = true;
 }
 
-const groupedWorldBlocks = groupBlocksByMaterial(worldBlocks);
+type CenterTerrainHit = {
+  terrainMaterial: Exclude<WorldMaterial, "cloud">;
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  blockPosition: [number, number, number];
+  blockKey: string;
+};
+
+type BreakableTerrainHit = Pick<CenterTerrainHit, "blockKey" | "blockPosition" | "terrainMaterial">;
+
+type DroppedBlockItem = {
+  id: string;
+  material: "dirt" | "wood";
+  blockPosition: [number, number, number];
+  spawnedAt: number;
+  phase: number;
+  drift: [number, number];
+};
+
+const collectedInventoryConfig = {
+  dirt: {
+    label: "Dirt",
+    icon: "/textures/world/dirt.svg",
+  },
+  wood: {
+    label: "Log",
+    icon: faceTexturePaths.wood.front,
+  },
+} satisfies Record<DroppedBlockItem["material"], { label: string; icon: string }>;
+
+function getCenterTerrainHit(raycaster: THREE.Raycaster, camera: THREE.Camera, scene: THREE.Scene, maxDistance: number) {
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hit = raycaster
+    .intersectObjects(scene.children, true)
+    .find(
+      (entry) =>
+        (entry.object.userData?.terrainMaterial as WorldMaterial | undefined) &&
+        entry.distance <= maxDistance,
+    );
+
+  if (!hit) return null;
+
+  const terrainMaterial = hit.object.userData?.terrainMaterial as WorldMaterial | undefined;
+
+  if (!terrainMaterial || terrainMaterial === "cloud") {
+    return null;
+  }
+
+  const normal = (hit.face?.normal ?? new THREE.Vector3(0, 1, 0)).clone();
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+  normal.applyMatrix3(normalMatrix).normalize();
+
+  const blockPosition = new THREE.Vector3();
+
+  if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
+    const instanceMatrix = new THREE.Matrix4();
+    hit.object.getMatrixAt(hit.instanceId, instanceMatrix);
+    blockPosition.setFromMatrixPosition(instanceMatrix);
+    hit.object.localToWorld(blockPosition);
+  } else {
+    blockPosition.copy(hit.object.getWorldPosition(new THREE.Vector3()));
+  }
+
+  const blockKey = `${blockPosition.x}:${blockPosition.y}:${blockPosition.z}`;
+
+  if (activeRemovedTerrainBlockKeys.has(blockKey)) {
+    return null;
+  }
+
+  return {
+    terrainMaterial,
+    point: hit.point.clone(),
+    normal,
+    blockPosition: [blockPosition.x, blockPosition.y, blockPosition.z] as [number, number, number],
+    blockKey,
+  } satisfies CenterTerrainHit;
+}
 
 function groupBlocksByMaterial(blocks: WorldBlock[]) {
   const grouped = {} as Record<WorldMaterial, [number, number, number][]>;
@@ -955,8 +1061,15 @@ function InstancedVoxelBlocks({
   );
 }
 
-function VoxelWorld() {
+function VoxelWorld({ removedBlockKeys }: { removedBlockKeys: Set<string> }) {
   const texturesByPath = useWorldTextures();
+  const groupedBlocks = useMemo(
+    () =>
+      groupBlocksByMaterial(
+        worldBlocks.filter((block) => !removedBlockKeys.has(`${block.position[0]}:${block.position[1]}:${block.position[2]}`)),
+      ),
+    [removedBlockKeys],
+  );
   const faceTexturesByMaterial = useMemo(
     () =>
       Object.fromEntries(
@@ -970,14 +1083,142 @@ function VoxelWorld() {
 
   return (
     <>
-      {(Object.keys(groupedWorldBlocks) as WorldMaterial[]).map((material) => (
+      {(Object.keys(groupedBlocks) as WorldMaterial[]).map((material) => (
         <InstancedVoxelBlocks
           key={material}
           materialId={material}
-          positions={groupedWorldBlocks[material]}
+          positions={groupedBlocks[material]}
           material={materialPalette[material]}
           faceTextures={faceTexturesByMaterial[material]}
           castShadow={material !== "cloud"}
+        />
+      ))}
+    </>
+  );
+}
+
+function DroppedBlockItemMesh({
+  item,
+  faceTextures,
+  canCollect,
+  onCollect,
+}: {
+  item: DroppedBlockItem;
+  faceTextures: THREE.Texture[];
+  canCollect: boolean;
+  onCollect: (item: DroppedBlockItem) => void;
+}) {
+  const { camera } = useThree();
+  const groupRef = useRef<THREE.Group>(null);
+  const collectedRef = useRef(false);
+  const centerXRef = useRef(item.blockPosition[0]);
+  const centerYRef = useRef(item.blockPosition[1] + 0.46);
+  const centerZRef = useRef(item.blockPosition[2]);
+  const horizontalVelocityRef = useRef(new THREE.Vector2(item.drift[0], item.drift[1]));
+  const verticalVelocityRef = useRef(1.8);
+  const groundedRef = useRef(false);
+  const itemHalfSize = 0.17;
+  const itemGravity = 9.8;
+  const bounceDamping = 0.22;
+  const airDrag = 0.92;
+  const groundFriction = 0.74;
+
+  useFrame((state, delta) => {
+    if (!groupRef.current) return;
+
+    const supportTop = getHighestSupportBelow(centerXRef.current, centerYRef.current - itemHalfSize, centerZRef.current);
+    const groundCenterY = supportTop + itemHalfSize;
+
+    centerXRef.current += horizontalVelocityRef.current.x * delta;
+    centerZRef.current += horizontalVelocityRef.current.y * delta;
+
+    if (!groundedRef.current) {
+      verticalVelocityRef.current -= itemGravity * delta;
+      centerYRef.current += verticalVelocityRef.current * delta;
+      horizontalVelocityRef.current.multiplyScalar(Math.pow(airDrag, delta * 60));
+
+      if (centerYRef.current <= groundCenterY) {
+        centerYRef.current = groundCenterY;
+
+        if (Math.abs(verticalVelocityRef.current) > 0.45) {
+          verticalVelocityRef.current = Math.abs(verticalVelocityRef.current) * bounceDamping;
+        } else {
+          verticalVelocityRef.current = 0;
+          groundedRef.current = true;
+        }
+      }
+    } else {
+      horizontalVelocityRef.current.multiplyScalar(Math.pow(groundFriction, delta * 60));
+    }
+
+    const bob = groundedRef.current ? Math.sin(state.clock.elapsedTime * 3.2 + item.phase) * 0.045 : 0;
+
+    groupRef.current.position.set(centerXRef.current, centerYRef.current + bob, centerZRef.current);
+    groupRef.current.rotation.set(0.28, state.clock.elapsedTime * 1.7 + item.phase, 0);
+
+    if (!canCollect || collectedRef.current) {
+      return;
+    }
+
+    const pickupDistance = groundedRef.current ? 0.7 : 0.7;
+    const horizontalDistance = Math.hypot(
+      groupRef.current.position.x - camera.position.x,
+      groupRef.current.position.z - camera.position.z,
+    );
+
+    if (horizontalDistance <= pickupDistance) {
+      collectedRef.current = true;
+      onCollect(item);
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[0.34, 0.34, 0.34]} />
+        {faceTextures.map((texture, index) => (
+          <meshStandardMaterial
+            key={`dropped-item-${item.id}-${index}-${texture.uuid}`}
+            attach={`material-${index}`}
+            map={texture}
+            color="#ffffff"
+            roughness={0.92}
+            metalness={0}
+          />
+        ))}
+      </mesh>
+    </group>
+  );
+}
+
+function DroppedBlockItems({
+  items,
+  canCollect,
+  onCollect,
+}: {
+  items: DroppedBlockItem[];
+  canCollect: boolean;
+  onCollect: (item: DroppedBlockItem) => void;
+}) {
+  const texturesByPath = useWorldTextures();
+  const faceTexturesByMaterial = useMemo(
+    () =>
+      ({
+        dirt: cubeFaceOrder.map(() => texturesByPath["/textures/world/dirt.svg"]),
+        wood: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.wood[face]]),
+      }) satisfies Record<DroppedBlockItem["material"], THREE.Texture[]>,
+    [texturesByPath],
+  );
+
+  return (
+    <>
+      {items.map((item) => (
+        <DroppedBlockItemMesh
+          key={item.id}
+          item={item}
+          faceTextures={faceTexturesByMaterial[item.material]}
+          canCollect={canCollect}
+          onCollect={onCollect}
         />
       ))}
     </>
@@ -1070,27 +1311,15 @@ function TerrainImpactParticles({ trigger, enabled }: { trigger: number; enabled
   useEffect(() => {
     if (!enabled || trigger === 0) return;
 
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const hit = raycaster
-      .intersectObjects(scene.children, true)
-      .find(
-        (entry) =>
-          (entry.object.userData?.terrainMaterial as WorldMaterial | undefined) &&
-          entry.distance <= terrainImpactConfig.maxDistance,
-      );
+    const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
 
-    if (!hit) return;
+    if (!terrainHit) return;
 
-    const terrainMaterial = hit.object.userData?.terrainMaterial as WorldMaterial | undefined;
+    const pool = poolsRef.current[terrainHit.terrainMaterial];
 
-    if (!terrainMaterial || terrainMaterial === "cloud") return;
-
-    const pool = poolsRef.current[terrainMaterial];
-
-    spawnOriginRef.current.copy(hit.point);
-    spawnNormalRef.current.copy(hit.face?.normal ?? new THREE.Vector3(0, 1, 0));
-    normalMatrixRef.current.getNormalMatrix(hit.object.matrixWorld);
-    spawnNormalRef.current.applyMatrix3(normalMatrixRef.current).normalize();
+    spawnOriginRef.current.set(...terrainHit.blockPosition).addScaledVector(terrainHit.normal, 0.5);
+    spawnOriginRef.current.lerp(terrainHit.point, 0.45);
+    spawnNormalRef.current.copy(terrainHit.normal);
 
     const tangentSeed =
       Math.abs(spawnNormalRef.current.y) > 0.82 ? tangentRef.current.set(1, 0, 0) : tangentRef.current.set(0, 1, 0);
@@ -1128,7 +1357,7 @@ function TerrainImpactParticles({ trigger, enabled }: { trigger: number; enabled
       };
     }
 
-    syncPoolMesh(terrainMaterial);
+    syncPoolMesh(terrainHit.terrainMaterial);
   }, [camera, enabled, raycaster, scene, syncPoolMesh, trigger]);
 
   useFrame((_state, delta) => {
@@ -1201,6 +1430,135 @@ function TerrainImpactParticles({ trigger, enabled }: { trigger: number; enabled
         })()
       ))}
     </>
+  );
+}
+
+function TerrainBreakOverlay({
+  trigger,
+  enabled,
+  swingHeld,
+  removedBlockKeys,
+  onBreakBlock,
+}: {
+  trigger: number;
+  enabled: boolean;
+  swingHeld: boolean;
+  removedBlockKeys: Set<string>;
+  onBreakBlock: (block: BreakableTerrainHit) => void;
+}) {
+  const { camera, scene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const textures = useTexture(Array.from(blockBreakTexturePaths)) as THREE.Texture[];
+  const [overlayState, setOverlayState] = useState<{
+    blockKey: string;
+    blockPosition: [number, number, number];
+    terrainMaterial: Exclude<WorldMaterial, "cloud">;
+    hits: number;
+  } | null>(null);
+
+  useEffect(() => {
+    textures.forEach((texture) => {
+      configurePixelTexture(texture);
+    });
+  }, [textures]);
+
+  useEffect(() => {
+    if (!enabled || trigger === 0) return;
+
+    const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
+
+    if (!terrainHit || removedBlockKeys.has(terrainHit.blockKey)) return;
+
+    setOverlayState((current) => {
+      if (current?.blockKey === terrainHit.blockKey) {
+        return {
+          ...current,
+          hits: current.hits + 1,
+          blockPosition: terrainHit.blockPosition,
+        };
+      }
+
+      return {
+        blockKey: terrainHit.blockKey,
+        blockPosition: terrainHit.blockPosition,
+        terrainMaterial: terrainHit.terrainMaterial,
+        hits: 1,
+      };
+    });
+  }, [camera, enabled, raycaster, removedBlockKeys, scene, trigger]);
+
+  useEffect(() => {
+    if (!overlayState || removedBlockKeys.has(overlayState.blockKey)) return;
+    if (overlayState.hits < blockBreakHitsRequired[overlayState.terrainMaterial]) return;
+
+    onBreakBlock({
+      blockKey: overlayState.blockKey,
+      blockPosition: overlayState.blockPosition,
+      terrainMaterial: overlayState.terrainMaterial,
+    });
+    setOverlayState(null);
+  }, [onBreakBlock, overlayState, removedBlockKeys]);
+
+  useFrame(() => {
+    if (!enabled || !swingHeld) {
+      setOverlayState((current) => (current ? null : current));
+      return;
+    }
+
+    const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
+
+    setOverlayState((current) => {
+      if (!current) return current;
+      if (removedBlockKeys.has(current.blockKey) || !terrainHit || terrainHit.blockKey !== current.blockKey) {
+        return null;
+      }
+
+      if (
+        current.blockPosition[0] !== terrainHit.blockPosition[0] ||
+        current.blockPosition[1] !== terrainHit.blockPosition[1] ||
+        current.blockPosition[2] !== terrainHit.blockPosition[2]
+      ) {
+        return {
+          ...current,
+          blockPosition: terrainHit.blockPosition,
+        };
+      }
+
+      return current;
+    });
+  });
+
+  if (!overlayState) return null;
+
+  const hitsRequired = blockBreakHitsRequired[overlayState.terrainMaterial];
+  const stage = Math.min(
+    textures.length - 1,
+    Math.floor(
+      (Math.max(0, Math.min(overlayState.hits - 1, hitsRequired - 1)) / Math.max(1, hitsRequired - 1)) * textures.length,
+    ),
+  );
+  const stageTexture = textures[stage];
+
+  return (
+    <mesh position={overlayState.blockPosition} scale={[1.018, 1.018, 1.018]} frustumCulled={false} renderOrder={4}>
+      <boxGeometry args={[1, 1, 1]} />
+      {cubeFaceOrder.map((face, index) => (
+        <meshBasicMaterial
+          key={`block-break-${face}-${stage}-${stageTexture.uuid}`}
+          attach={`material-${index}`}
+          map={stageTexture}
+          color="#ffffff"
+          transparent
+          alphaTest={0.05}
+          depthTest
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
+          toneMapped={false}
+        />
+      ))}
+    </mesh>
   );
 }
 
@@ -1567,6 +1925,12 @@ export default function GameScene() {
   const [armSwingHeld, setArmSwingHeld] = useState(false);
   const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
   const [jumpTick, setJumpTick] = useState(0);
+  const [removedTerrainBlockKeys, setRemovedTerrainBlockKeys] = useState<Set<string>>(() => new Set());
+  const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
+  const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
+    dirt: 0,
+    wood: 0,
+  });
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
@@ -1583,6 +1947,51 @@ export default function GameScene() {
   const triggerJump = useCallback(() => {
     setJumpTick((current) => current + 1);
   }, []);
+
+  const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
+    if (activeRemovedTerrainBlockKeys.has(block.blockKey)) return;
+
+    activeRemovedTerrainBlockKeys = new Set(activeRemovedTerrainBlockKeys).add(block.blockKey);
+    setRemovedTerrainBlockKeys(activeRemovedTerrainBlockKeys);
+
+    const droppedMaterial =
+      block.terrainMaterial === "wood"
+        ? "wood"
+        : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade"
+          ? "dirt"
+        : null;
+
+    if (droppedMaterial) {
+      setDroppedItems((current) => [
+        ...current,
+        (() => {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.9 + Math.random() * 0.45;
+
+          return {
+            id: `${block.blockKey}-${current.length}-${Date.now()}`,
+            material: droppedMaterial,
+            blockPosition: block.blockPosition,
+            spawnedAt: performance.now() / 1000,
+            phase: Math.random() * Math.PI * 2,
+            drift: [Math.cos(angle) * speed, Math.sin(angle) * speed] as [number, number],
+          };
+        })(),
+      ]);
+    }
+  }, []);
+
+  const collectDroppedItem = useCallback((item: DroppedBlockItem) => {
+    setDroppedItems((current) => current.filter((entry) => entry.id !== item.id));
+    setCollectedInventory((current) => ({
+      ...current,
+      [item.material]: current[item.material] + 1,
+    }));
+  }, []);
+
+  useEffect(() => {
+    activeRemovedTerrainBlockKeys = removedTerrainBlockKeys;
+  }, [removedTerrainBlockKeys]);
 
   useEffect(() => {
     const handleClick = () => {
@@ -1649,8 +2058,16 @@ export default function GameScene() {
           hemisphereLightRef={hemisphereLightRef}
           directionalLightRef={directionalLightRef}
         />
-        <VoxelWorld />
+        <VoxelWorld removedBlockKeys={removedTerrainBlockKeys} />
+        <DroppedBlockItems items={droppedItems} canCollect={locked && !activePanel} onCollect={collectDroppedItem} />
         <TerrainImpactParticles trigger={terrainImpactTrigger} enabled={locked && !activePanel} />
+        <TerrainBreakOverlay
+          trigger={terrainImpactTrigger}
+          enabled={locked && !activePanel}
+          swingHeld={armSwingHeld}
+          removedBlockKeys={removedTerrainBlockKeys}
+          onBreakBlock={removeTerrainBlock}
+        />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
@@ -1725,6 +2142,23 @@ export default function GameScene() {
             Jump
           </button>
         ) : null}
+
+        <section className="collected-inventory" aria-label="Collected block inventory" data-ui-layer="true">
+          <p className="collected-inventory-title">Collected</p>
+          <div className="collected-inventory-grid">
+            {(Object.keys(collectedInventoryConfig) as DroppedBlockItem["material"][]).map((material) => (
+              <div key={material} className="collected-slot">
+                <img
+                  className="collected-slot-icon"
+                  src={collectedInventoryConfig[material].icon}
+                  alt={collectedInventoryConfig[material].label}
+                />
+                <span className="collected-slot-count">{collectedInventory[material]}</span>
+                <span className="collected-slot-label">{collectedInventoryConfig[material].label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <div className="quick-links" data-ui-layer="true">
           <a href="#fallback">Skip 3D / Open standard site</a>
