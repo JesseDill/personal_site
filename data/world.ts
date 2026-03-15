@@ -4,6 +4,7 @@ export type WorldMaterial =
   | "grass"
   | "grassShade"
   | "dirt"
+  | "bedrock"
   | "path"
   | "stone"
   | "stoneDark"
@@ -121,25 +122,25 @@ export const worldSky = {
 };
 
 export const landmarks: Landmark[] = [
-  { id: "about", position: [0, 0.75, -5], label: "Open Spawn Cabin", subtitle: "About", accent: "aboutAccent" },
-  { id: "resume", position: [0, 0.75, -11], label: "Open Resume Keep", subtitle: "Resume", accent: "resumeAccent" },
+  { id: "about", position: [0, 1.75, -5], label: "Open Spawn Cabin", subtitle: "About", accent: "aboutAccent" },
+  { id: "resume", position: [0, 1.75, -11], label: "Open Resume Keep", subtitle: "Resume", accent: "resumeAccent" },
   {
     id: "projects",
-    position: [8, 0.75, -12],
+    position: [8, 1.75, -12],
     label: "Enter Projects Forge",
     subtitle: "Projects",
     accent: "projectsAccent",
   },
   {
     id: "research",
-    position: [-8, 0.75, -14],
+    position: [-8, 1.75, -14],
     label: "Enter Research Lab",
     subtitle: "Research",
     accent: "researchAccent",
   },
   {
     id: "contact",
-    position: [0, 0.75, -20],
+    position: [0, 1.75, -20],
     label: "Open Contact Portal",
     subtitle: "Contact",
     accent: "contactAccent",
@@ -310,6 +311,9 @@ function addPerimeterWalls(blocks: WorldBlock[]) {
 
 function buildWorldBlocks() {
   const blocks: WorldBlock[] = [];
+  const verticalOffset = 1;
+
+  addRect(blocks, worldBounds.minX, worldBounds.maxX, worldBounds.minZ, worldBounds.maxZ, -1.5, "bedrock", true);
 
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     for (let z = worldBounds.minZ; z <= worldBounds.maxZ; z += 1) {
@@ -361,7 +365,11 @@ function buildWorldBlocks() {
     block.material = "dirt";
   }
 
-  return Array.from(dedupedBlocks.values());
+  return Array.from(dedupedBlocks.values()).map((block) => ({
+    ...block,
+    position: [block.position[0], block.position[1] + verticalOffset, block.position[2]] as [number, number, number],
+    solid: block.solid || block.position[1] === -0.5,
+  }));
 }
 
 function cellKey(x: number, z: number) {

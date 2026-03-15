@@ -58,6 +58,7 @@ const materialPalette = {
     roughness: 1,
   },
   dirt: { textures: { all: "/textures/world/dirt.svg" }, uiColor: "#8b6541", roughness: 1 },
+  bedrock: { textures: { all: "/textures/world/bedrock.svg" }, uiColor: "#52565c", roughness: 1 },
   path: { textures: { all: "/textures/world/path.svg" }, uiColor: "#b89b6f", roughness: 0.96 },
   stone: { textures: { all: "/textures/world/stone.svg" }, uiColor: "#9f9380", roughness: 1 },
   stoneDark: { textures: { all: "/textures/world/stone-dark.svg" }, uiColor: "#5f5a54", roughness: 1 },
@@ -214,6 +215,7 @@ const blockBreakHitsRequired = {
   grass: 4,
   grassShade: 4,
   dirt: 4,
+  bedrock: Number.MAX_SAFE_INTEGER,
   path: 5,
   stone: 8,
   stoneDark: 9,
@@ -225,6 +227,8 @@ const blockBreakHitsRequired = {
   researchAccent: 10,
   contactAccent: 10,
 } satisfies Record<Exclude<WorldMaterial, "cloud">, number>;
+
+const unbreakableTerrainMaterials = new Set<Exclude<WorldMaterial, "cloud">>(["bedrock"]);
 
 const playerCollisionConfig = {
   radius: 0.34,
@@ -1618,6 +1622,10 @@ function TerrainBreakOverlay({
     const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
 
     if (!terrainHit || (removedBlockKeys.has(terrainHit.blockKey) && !activePlacedTerrainBlocks.has(terrainHit.blockKey))) return;
+    if (unbreakableTerrainMaterials.has(terrainHit.terrainMaterial)) {
+      setOverlayState(null);
+      return;
+    }
 
     setOverlayState((current) => {
       if (current?.blockKey === terrainHit.blockKey) {
@@ -1639,6 +1647,10 @@ function TerrainBreakOverlay({
 
   useEffect(() => {
     if (!overlayState || (removedBlockKeys.has(overlayState.blockKey) && !activePlacedTerrainBlocks.has(overlayState.blockKey))) return;
+    if (unbreakableTerrainMaterials.has(overlayState.terrainMaterial)) {
+      setOverlayState(null);
+      return;
+    }
     if (overlayState.hits < blockBreakHitsRequired[overlayState.terrainMaterial]) return;
 
     onBreakBlock({
@@ -1660,6 +1672,9 @@ function TerrainBreakOverlay({
     setOverlayState((current) => {
       if (!current) return current;
       if ((removedBlockKeys.has(current.blockKey) && !activePlacedTerrainBlocks.has(current.blockKey)) || !terrainHit || terrainHit.blockKey !== current.blockKey) {
+        return null;
+      }
+      if (unbreakableTerrainMaterials.has(current.terrainMaterial) || unbreakableTerrainMaterials.has(terrainHit.terrainMaterial)) {
         return null;
       }
 
@@ -1956,7 +1971,7 @@ function PlayerController({
   const gravity = 22;
 
   useEffect(() => {
-    camera.position.set(0, playerCollisionConfig.eyeHeight, 5.5);
+    camera.position.set(0, playerCollisionConfig.eyeHeight + 1, 5.5);
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
@@ -1994,7 +2009,7 @@ function PlayerController({
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
-    camera.position.y = playerCollisionConfig.eyeHeight;
+    camera.position.y = playerCollisionConfig.eyeHeight + 1;
   }, [camera, enabled, onMovingChange]);
 
   useFrame((_state, delta) => {
@@ -2209,6 +2224,8 @@ export default function GameScene() {
   }, []);
 
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
+    if (unbreakableTerrainMaterials.has(block.terrainMaterial)) return;
+
     if (activePlacedTerrainBlocks.has(block.blockKey)) {
       setPlacedTerrainBlocks((current) => current.filter((entry) => getBlockKey(entry.position) !== block.blockKey));
     } else {
