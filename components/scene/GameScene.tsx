@@ -438,6 +438,9 @@ const collectedInventoryConfig = {
   },
 } satisfies Record<DroppedBlockItem["material"], { label: string; icon: string }>;
 
+const collectedInventoryMaterials = Object.keys(collectedInventoryConfig) as DroppedBlockItem["material"][];
+const hotbarSlotCount = 9;
+
 function getCenterTerrainHit(raycaster: THREE.Raycaster, camera: THREE.Camera, scene: THREE.Scene, maxDistance: number) {
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   const hit = raycaster
@@ -1929,6 +1932,7 @@ export default function GameScene() {
   const [jumpTick, setJumpTick] = useState(0);
   const [removedTerrainBlockKeys, setRemovedTerrainBlockKeys] = useState<Set<string>>(() => new Set());
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
+  const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
     dirt: 0,
     wood: 0,
@@ -1994,6 +1998,22 @@ export default function GameScene() {
   useEffect(() => {
     activeRemovedTerrainBlockKeys = removedTerrainBlockKeys;
   }, [removedTerrainBlockKeys]);
+
+  useEffect(() => {
+    const handleHotbarKeyDown = (event: KeyboardEvent) => {
+      if (!locked || activePanel) return;
+      if (!event.code.startsWith("Digit")) return;
+
+      const nextSlot = Number(event.code.replace("Digit", "")) - 1;
+      if (!Number.isInteger(nextSlot) || nextSlot < 0 || nextSlot >= hotbarSlotCount) return;
+
+      event.preventDefault();
+      setSelectedInventorySlot(nextSlot);
+    };
+
+    window.addEventListener("keydown", handleHotbarKeyDown);
+    return () => window.removeEventListener("keydown", handleHotbarKeyDown);
+  }, [activePanel, locked]);
 
   useEffect(() => {
     const handleClick = () => {
@@ -2102,85 +2122,69 @@ export default function GameScene() {
       </Canvas>
 
       <div className="hud">
-        <section className="status-card" data-ui-layer="true" aria-label="World controls">
-          <p className="eyebrow">Voxel portfolio prototype</p>
-          <h1 className="title">Portfolio Craft</h1>
-          <p className="subtitle">
-            Explore a handcrafted block world, aim at a landmark, and click to open the matching section.
-          </p>
-          <button
-            id="enter-world"
-            type="button"
-            className="enter-world"
-            disabled={locked || Boolean(activePanel)}
-            aria-describedby="world-controls"
-          >
-            {locked ? "Exploring" : activePanel ? "Close Panel To Re-enter" : "Enter World"}
-          </button>
-          <p id="world-controls" className="locked-hint">
-            {locked ? "WASD to move, Space to jump. Click a glowing block to inspect it. Press ESC to free the cursor." : "Cursor unlocked. Use the quick bar or the classic layout if you want the fast path."}
-          </p>
-        </section>
+        {!locked ? (
+          <section className="status-card" data-ui-layer="true" aria-label="World controls">
+            <p className="eyebrow">Voxel portfolio prototype</p>
+            <h1 className="title">Portfolio Craft</h1>
+            <p className="subtitle">
+              Explore a handcrafted block world, aim at a landmark, and click to open the matching section.
+            </p>
+            <button
+              id="enter-world"
+              type="button"
+              className="enter-world"
+              disabled={locked || Boolean(activePanel)}
+              aria-describedby="world-controls"
+            >
+              {locked ? "Exploring" : activePanel ? "Close Panel To Re-enter" : "Enter World"}
+            </button>
+            <p id="world-controls" className="locked-hint">
+              {locked ? "WASD to move, Space to jump. Click a glowing block to inspect it. Press ESC to free the cursor." : "Cursor unlocked. Enter the world to explore the interactive blocks."}
+            </p>
+          </section>
+        ) : null}
 
         <div className="crosshair" aria-hidden="true" />
 
         {targetLabel && locked ? <div className="tooltip">{targetLabel}</div> : null}
 
-        {locked && !activePanel ? (
-          <button
-            type="button"
-            className="jump-button"
-            data-ui-layer="true"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              triggerJump();
-            }}
-            onTouchStart={(event) => {
-              event.preventDefault();
-              triggerJump();
-            }}
-            aria-label="Jump"
-          >
-            Jump
-          </button>
-        ) : null}
-
         <section className="collected-inventory" aria-label="Collected block inventory" data-ui-layer="true">
           <p className="collected-inventory-title">Collected</p>
           <div className="collected-inventory-grid">
-            {(Object.keys(collectedInventoryConfig) as DroppedBlockItem["material"][]).map((material) => (
-              <div key={material} className="collected-slot">
-                <img
-                  className="collected-slot-icon"
-                  src={collectedInventoryConfig[material].icon}
-                  alt={collectedInventoryConfig[material].label}
-                />
-                <span className="collected-slot-count">{collectedInventory[material]}</span>
-                <span className="collected-slot-label">{collectedInventoryConfig[material].label}</span>
+            {Array.from({ length: hotbarSlotCount }, (_, index) => {
+              const visibleMaterials = collectedInventoryMaterials.filter((material) => collectedInventory[material] > 0);
+              const material = visibleMaterials[index] ?? null;
+
+              return (
+              <div
+                key={material ?? `empty-slot-${index}`}
+                className={`collected-slot${selectedInventorySlot === index ? " selected" : ""}`}
+                aria-selected={selectedInventorySlot === index}
+              >
+                {material ? (
+                  <>
+                    <img
+                      className="collected-slot-icon"
+                      src={collectedInventoryConfig[material].icon}
+                      alt={collectedInventoryConfig[material].label}
+                    />
+                    <span className="collected-slot-count">{collectedInventory[material]}</span>
+                  </>
+                ) : (
+                  <span className="collected-slot-empty" aria-hidden="true" />
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
-        <div className="quick-links" data-ui-layer="true">
-          <a href="#fallback">Skip 3D / Open standard site</a>
-          <a href="mailto:hello@example.com">Contact</a>
-        </div>
-
-        <nav className="inventory" aria-label="Quick open portfolio sections" data-ui-layer="true">
-          {landmarks.map((landmark) => (
-            <button
-              key={landmark.id}
-              type="button"
-              className={`inventory-slot${activePanel === landmark.id ? " active" : ""}`}
-              style={{ "--slot-color": materialPalette[landmark.accent].uiColor } as CSSProperties}
-              onClick={() => setActivePanel(landmark.id)}
-            >
-              <span className="slot-label">{landmark.subtitle}</span>
-              <span className="slot-title">{interactionContent[landmark.id].title}</span>
-            </button>
-          ))}
-        </nav>
+        {!locked ? (
+          <div className="quick-links" data-ui-layer="true">
+            <a href="#fallback">Skip 3D / Open standard site</a>
+            <a href="mailto:hello@example.com">Contact</a>
+          </div>
+        ) : null}
       </div>
 
       {content ? (
