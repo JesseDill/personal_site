@@ -1,6 +1,6 @@
 "use client";
 
-import { PointerLockControls, useTexture } from "@react-three/drei";
+import { Hud, PerspectiveCamera, PointerLockControls, useTexture } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -152,8 +152,9 @@ const uniqueSkyTexturePaths = Array.from(
 
 const armTextureDefinitions = {
   skin: {
-    side: "/textures/player/arm-skin-side.svg",
-    top: "/textures/player/arm-skin-top.svg",
+    // side: "/textures/player/arm-skin-side.svg",
+    side: "/textures/player/minecraft_arm_one_side.jpg",
+    top: "/textures/player/minecraft_arm_top.png",
     bottom: "/textures/player/arm-skin-bottom.svg",
   },
   sleeve: {
@@ -166,6 +167,11 @@ const armTextureDefinitions = {
     top: "/textures/player/arm-cuff-top.svg",
     bottom: "/textures/player/arm-cuff-bottom.svg",
   },
+} as const;
+
+const armRenderFlags = {
+  sleeve: false,
+  cuff: false,
 } as const;
 
 const armFaceTexturePaths = Object.fromEntries(
@@ -730,12 +736,20 @@ function InstancedVoxelBlocks({
     });
 
     ref.current.instanceMatrix.needsUpdate = true;
+    ref.current.computeBoundingBox();
+    ref.current.computeBoundingSphere();
   }, [dummy, positions]);
 
   if (positions.length === 0) return null;
 
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, positions.length]} castShadow={castShadow} receiveShadow>
+    <instancedMesh
+      ref={ref}
+      args={[undefined, undefined, positions.length]}
+      castShadow={castShadow}
+      receiveShadow
+      frustumCulled={false}
+    >
       <boxGeometry args={[1, 1, 1]} />
       {faceTextures.map((texture, index) => (
         <meshStandardMaterial
@@ -786,15 +800,23 @@ function VoxelWorld() {
 function PlayerArmViewmodel({
   moving,
   swingTick,
+  swingHeld,
 }: {
   moving: boolean;
   swingTick: number;
+  swingHeld: boolean;
 }) {
   const armRef = useRef<THREE.Group>(null);
   const bobPhaseRef = useRef(0);
   const bobBlendRef = useRef(0);
   const swingProgressRef = useRef(1);
   const armTextures = useArmTextures();
+  const arm_rotation: [number, number, number] = [-0.55, 0.22, -0.08];
+  const arm_position: [number, number, number] = [0.98, -1.14, 0];
+  const swing_duration = 0.22;
+
+  const swing_position_delta: [number, number, number] = [-0.1, -0.12, -0.5];
+  const swing_rotation_delta: [number, number, number] = [-0.66, 0.24, 0.9]; // pitch, yaw, roll in radians
 
   useEffect(() => {
     swingProgressRef.current = 0;
@@ -805,72 +827,85 @@ function PlayerArmViewmodel({
 
     bobBlendRef.current = THREE.MathUtils.damp(bobBlendRef.current, moving ? 1 : 0, 8, delta);
     bobPhaseRef.current += delta * THREE.MathUtils.lerp(1.3, 10.5, bobBlendRef.current);
-    swingProgressRef.current = Math.min(1, swingProgressRef.current + delta / 0.12);
+    swingProgressRef.current += delta / swing_duration;
+
+    if (swingProgressRef.current >= 1) {
+      swingProgressRef.current = swingHeld ? 0 : 1;
+    }
 
     const bobX = Math.sin(bobPhaseRef.current) * 0.05 * bobBlendRef.current;
     const bobY = Math.abs(Math.cos(bobPhaseRef.current * 0.9)) * 0.06 * bobBlendRef.current;
     const swingProgress = swingProgressRef.current;
-    const strikePhase = 0.34;
+    const strikePhase = .34;
     const swing =
       swingProgress < strikePhase
         ? THREE.MathUtils.smootherstep(swingProgress / strikePhase, 0, 1)
         : 1 - THREE.MathUtils.smoothstep((swingProgress - strikePhase) / (1 - strikePhase), 0, 1) * 0.92;
 
-    armRef.current.position.set(0.88 + bobX + swing * 0.1, -0.96 + bobY - swing * 0.12, 0);
+    armRef.current.position.set(arm_position[0] + bobX + swing * swing_position_delta[0], arm_position[1] + bobY - swing * swing_position_delta[1], arm_position[2] + swing * swing_position_delta[2]);
     armRef.current.rotation.set(
-      -0.45 - bobY * 0.25 + swing * 0.66,
-      0.22 - bobX * 0.18 + swing * 0.24,
-      -0.22 + bobX * 0.7 + swing * 0.9,
+      arm_rotation[0] - bobY * 0.25 + swing * swing_rotation_delta[0],
+      arm_rotation[1] - bobX * 0.18 + swing * swing_rotation_delta[1],
+      arm_rotation[2] + bobX * 0.7 + swing * swing_rotation_delta[2],
     );
   });
-
   return (
     <>
       <ambientLight intensity={1} />
-      <group ref={armRef} position={[0.88, -0.96, 0]} rotation={[-0.45, 0.22, -0.22]} scale={1.45}>
-        <group renderOrder={2000}>
-          <mesh frustumCulled={false} renderOrder={2000} position={[0.02, -0.22, 0]}>
-            <boxGeometry args={[0.29, 0.94, 0.29]} />
+      {/* Arm viewmodel local transform cheat sheet:
+          rotation[0] / x: pitch the arm up or down on screen
+          rotation[1] / y: yaw the arm inward toward screen center or outward toward the edge
+          rotation[2] / z: roll the arm clockwise/counterclockwise
+          To rotate the arm in toward the screen center, usually adjust rotation[1].
+          To rotate it farther out toward the screen edge, adjust rotation[1] the opposite way. */}
+      <group ref={armRef} position={[0.88, -0.96, 0]} rotation={arm_rotation} scale={1.45}>
+        <group>
+          <mesh frustumCulled={false} position={[0.02, -0.24, -0.006]}>
+            <boxGeometry args={[0.29, 1.04, 0.29]} />
             {armTextures.skin.map((texture, index) => (
               <meshBasicMaterial
                 key={`skin-${index}-${texture.uuid}`}
                 attach={`material-${index}`}
                 map={texture}
                 color="#ffffff"
-                depthTest={false}
-                depthWrite={false}
+                depthTest
+                depthWrite
                 toneMapped={false}
               />
             ))}
           </mesh>
-          <mesh frustumCulled={false} renderOrder={2001} position={[0.02, 0.16, 0]}>
-            <boxGeometry args={[0.31, 0.26, 0.31]} />
-            {armTextures.sleeve.map((texture, index) => (
-              <meshBasicMaterial
-                key={`sleeve-${index}-${texture.uuid}`}
-                attach={`material-${index}`}
-                map={texture}
-                color="#ffffff"
-                depthTest={false}
-                depthWrite={false}
-                toneMapped={false}
-              />
-            ))}
-          </mesh>
-          <mesh frustumCulled={false} renderOrder={2002} position={[0.02, 0.29, 0]}>
-            <boxGeometry args={[0.33, 0.08, 0.33]} />
-            {armTextures.cuff.map((texture, index) => (
-              <meshBasicMaterial
-                key={`cuff-${index}-${texture.uuid}`}
-                attach={`material-${index}`}
-                map={texture}
-                color="#ffffff"
-                depthTest={false}
-                depthWrite={false}
-                toneMapped={false}
-              />
-            ))}
-          </mesh>
+          {armRenderFlags.sleeve ? (
+            <mesh frustumCulled={false} position={[0.02, 0.19, 0.016]}>
+              <boxGeometry args={[0.325, 0.3, 0.325]} />
+              {armTextures.sleeve.map((texture, index) => (
+                <meshBasicMaterial
+                  key={`sleeve-${index}-${texture.uuid}`}
+                  attach={`material-${index}`}
+                  map={texture}
+                  color="#ffffff"
+                  depthTest
+                  depthWrite
+                  toneMapped={false}
+                />
+              ))}
+            </mesh>
+          ) : null}
+          {armRenderFlags.cuff ? (
+            <mesh frustumCulled={false} position={[0.02, 0.31, 0.02]}>
+              <boxGeometry args={[0.345, 0.08, 0.345]} />
+              {armTextures.cuff.map((texture, index) => (
+                <meshBasicMaterial
+                  key={`cuff-${index}-${texture.uuid}`}
+                  attach={`material-${index}`}
+                  map={texture}
+                  color="#ffffff"
+                  depthTest
+                  depthWrite
+                  toneMapped={false}
+                />
+              ))}
+            </mesh>
+          ) : null}
         </group>
       </group>
     </>
@@ -1039,6 +1074,7 @@ export default function GameScene() {
   const [locked, setLocked] = useState(false);
   const [playerMoving, setPlayerMoving] = useState(false);
   const [armSwingTick, setArmSwingTick] = useState(0);
+  const [armSwingHeld, setArmSwingHeld] = useState(false);
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
@@ -1062,12 +1098,31 @@ export default function GameScene() {
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
       if (!locked || event.button !== 0) return;
+      setArmSwingHeld(true);
       setArmSwingTick((current) => current + 1);
     };
 
     window.addEventListener("mousedown", handleMouseDown);
     return () => window.removeEventListener("mousedown", handleMouseDown);
   }, [locked]);
+
+  useEffect(() => {
+    const handleMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      setArmSwingHeld(false);
+    };
+
+    const handleWindowBlur = () => {
+      setArmSwingHeld(false);
+    };
+
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, []);
 
   const content = activePanel ? interactionContent[activePanel] : null;
 
@@ -1099,6 +1154,13 @@ export default function GameScene() {
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
 
+        {locked && !activePanel ? (
+          <Hud renderPriority={1}>
+            <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={48} />
+            <PlayerArmViewmodel moving={playerMoving} swingTick={armSwingTick} swingHeld={armSwingHeld} />
+          </Hud>
+        ) : null}
+
         <PlayerController enabled={locked} onMovingChange={setPlayerMoving} />
         <InteractionRaycast onTarget={onTarget} />
         <PointerLockControls
@@ -1106,27 +1168,13 @@ export default function GameScene() {
           onLock={() => setLocked(true)}
           onUnlock={() => {
             setLocked(false);
+            setArmSwingHeld(false);
             setPlayerMoving(false);
             setTarget(null);
             setTargetLabel(null);
           }}
         />
       </Canvas>
-
-      {locked && !activePanel ? (
-        <Canvas
-          camera={{ fov: 48, position: [0, 0, 3.2] }}
-          gl={{ alpha: true, premultipliedAlpha: false, antialias: false }}
-          style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1, background: "transparent" }}
-          onCreated={({ gl, scene }) => {
-            gl.autoClear = true;
-            gl.setClearColor(0x000000, 0);
-            scene.background = null;
-          }}
-        >
-          <PlayerArmViewmodel moving={playerMoving} swingTick={armSwingTick} />
-        </Canvas>
-      ) : null}
 
       <div className="hud">
         <section className="status-card" data-ui-layer="true" aria-label="World controls">
