@@ -57,6 +57,7 @@ const materialPalette = {
     uiColor: "#6a8b45",
     roughness: 1,
   },
+  dirt: { textures: { all: "/textures/world/dirt.svg" }, uiColor: "#8b6541", roughness: 1 },
   path: { textures: { all: "/textures/world/path.svg" }, uiColor: "#b89b6f", roughness: 0.96 },
   stone: { textures: { all: "/textures/world/stone.svg" }, uiColor: "#9f9380", roughness: 1 },
   stoneDark: { textures: { all: "/textures/world/stone-dark.svg" }, uiColor: "#5f5a54", roughness: 1 },
@@ -212,6 +213,7 @@ const blockBreakTexturePaths = [
 const blockBreakHitsRequired = {
   grass: 4,
   grassShade: 4,
+  dirt: 4,
   path: 5,
   stone: 8,
   stoneDark: 9,
@@ -1957,7 +1959,7 @@ export default function GameScene() {
     const droppedMaterial =
       block.terrainMaterial === "wood"
         ? "wood"
-        : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade"
+        : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt"
           ? "dirt"
         : null;
 

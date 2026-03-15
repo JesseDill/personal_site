@@ -3,6 +3,7 @@ import type { InteractionId } from "@/data/interactions";
 export type WorldMaterial =
   | "grass"
   | "grassShade"
+  | "dirt"
   | "path"
   | "stone"
   | "stoneDark"
@@ -350,6 +351,15 @@ function buildWorldBlocks() {
   blocks.forEach((block) => {
     dedupedBlocks.set(`${block.position[0]}:${block.position[1]}:${block.position[2]}`, block);
   });
+
+  for (const block of dedupedBlocks.values()) {
+    if (block.material !== "grass" && block.material !== "grassShade") continue;
+
+    const blockAbove = dedupedBlocks.get(`${block.position[0]}:${block.position[1] + 1}:${block.position[2]}`);
+    if (!blockAbove) continue;
+
+    block.material = "dirt";
+  }
 
   return Array.from(dedupedBlocks.values());
 }
