@@ -2271,7 +2271,7 @@ function BillboardIntroText({ position }: { position: [number, number, number] }
       outlineColor="#1f2937"
       outlineWidth={0.012}
     >
-      {"Hi there!\nFeel free to check out the icons or walk around."}
+      {"Hi there!"}
     </Text>
   );
 }
