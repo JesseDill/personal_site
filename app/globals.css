@@ -71,7 +71,8 @@ a {
 .status-card,
 .quick-links,
 .inventory,
-.panel {
+.panel,
+.jump-button {
   pointer-events: auto;
 }
 
@@ -119,7 +120,8 @@ a {
 .inventory-slot,
 .panel .cta,
 .panel button,
-.section-link {
+.section-link,
+.jump-button {
   appearance: none;
   border: 3px solid var(--earth-dark);
   box-shadow:
@@ -213,11 +215,20 @@ a {
 .quick-links a,
 .panel .cta,
 .panel button,
-.section-link {
+.section-link,
+.jump-button {
   min-height: 2.75rem;
   padding: 0.65rem 0.9rem;
   background: #dfeab9;
   font-size: 0.78rem;
+}
+
+.jump-button {
+  position: absolute;
+  right: 1rem;
+  bottom: 7.35rem;
+  min-width: 6.5rem;
+  z-index: 2;
 }
 
 .inventory {

@@ -8,7 +8,6 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import {
   landmarks,
-  obstacleCells,
   type WorldBlock,
   worldBlocks,
   worldBounds,
@@ -201,6 +200,173 @@ const terrainImpactConfig = {
   randomVelocity: 0.75,
   angularVelocity: 8,
 } as const;
+
+const playerCollisionConfig = {
+  radius: 0.34,
+  height: 1.8,
+  eyeHeight: 1.6,
+  boundaryPadding: 0.5,
+  stepHeight: 0.65,
+  groundSnapDistance: 0.18,
+} as const;
+
+const blockedInteractionCells = new Set(landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`));
+
+const solidColumns = worldBlocks.reduce(
+  (columns, block) => {
+    if (!block.solid) return columns;
+
+    const key = `${Math.round(block.position[0])}:${Math.round(block.position[2])}`;
+    const segments = columns.get(key) ?? [];
+    segments.push({
+      bottom: block.position[1] - 0.5,
+      top: block.position[1] + 0.5,
+      cellX: Math.round(block.position[0]),
+      cellZ: Math.round(block.position[2]),
+    });
+    columns.set(key, segments);
+    return columns;
+  },
+  new Map<string, Array<{ bottom: number; top: number; cellX: number; cellZ: number }>>(),
+);
+
+function getOccupiedCellRange(center: number, radius: number) {
+  return {
+    min: Math.ceil(center - radius - 0.5),
+    max: Math.floor(center + radius + 0.5),
+  };
+}
+
+function overlapsCellFootprint(x: number, z: number, cellX: number, cellZ: number) {
+  return (
+    x + playerCollisionConfig.radius > cellX - 0.5 &&
+    x - playerCollisionConfig.radius < cellX + 0.5 &&
+    z + playerCollisionConfig.radius > cellZ - 0.5 &&
+    z - playerCollisionConfig.radius < cellZ + 0.5
+  );
+}
+
+function getHighestSupportBelow(x: number, feetY: number, z: number) {
+  const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
+  const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
+  let highestSupport = Number.NEGATIVE_INFINITY;
+
+  for (let cellX = xRange.min; cellX <= xRange.max; cellX += 1) {
+    for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
+      if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
+
+      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      if (!column) continue;
+
+      column.forEach((segment) => {
+        if (segment.top <= feetY + 0.001) {
+          highestSupport = Math.max(highestSupport, segment.top);
+        }
+      });
+    }
+  }
+
+  return highestSupport === Number.NEGATIVE_INFINITY ? 0 : highestSupport;
+}
+
+function canPlayerOccupyPosition(x: number, feetY: number, z: number) {
+  const inset = playerCollisionConfig.boundaryPadding + playerCollisionConfig.radius;
+  const insideBounds =
+    x > worldBounds.minX + inset &&
+    x < worldBounds.maxX - inset &&
+    z > worldBounds.minZ + inset &&
+    z < worldBounds.maxZ - inset;
+
+  if (!insideBounds) {
+    return false;
+  }
+
+  const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
+  const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
+  const bodyBottom = feetY + 0.001;
+  const bodyTop = feetY + playerCollisionConfig.height - 0.001;
+
+  for (let cellX = xRange.min; cellX <= xRange.max; cellX += 1) {
+    for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
+      if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
+
+      if (blockedInteractionCells.has(`${cellX}:${cellZ}`)) {
+        return false;
+      }
+
+      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      if (!column) continue;
+
+      if (column.some((segment) => segment.top > bodyBottom && segment.bottom < bodyTop)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function findStepUpHeight(x: number, currentFeetY: number, z: number) {
+  const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
+  const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
+  let bestStepHeight: number | null = null;
+
+  for (let cellX = xRange.min; cellX <= xRange.max; cellX += 1) {
+    for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
+      if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
+
+      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      if (!column) continue;
+
+      column.forEach((segment) => {
+        const stepHeight = segment.top - currentFeetY;
+        if (stepHeight <= 0.001 || stepHeight > playerCollisionConfig.stepHeight) {
+          return;
+        }
+
+        if (canPlayerOccupyPosition(x, segment.top, z)) {
+          bestStepHeight = bestStepHeight === null ? segment.top : Math.max(bestStepHeight, segment.top);
+        }
+      });
+    }
+  }
+
+  return bestStepHeight;
+}
+
+function resolveUpwardFeetPosition(x: number, currentFeetY: number, targetFeetY: number, z: number) {
+  if (canPlayerOccupyPosition(x, targetFeetY, z)) {
+    return targetFeetY;
+  }
+
+  const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
+  const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
+  let lowestCeiling = Number.POSITIVE_INFINITY;
+
+  for (let cellX = xRange.min; cellX <= xRange.max; cellX += 1) {
+    for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
+      if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
+
+      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      if (!column) continue;
+
+      column.forEach((segment) => {
+        if (
+          segment.bottom >= currentFeetY + playerCollisionConfig.height - 0.001 &&
+          segment.bottom < targetFeetY + playerCollisionConfig.height
+        ) {
+          lowestCeiling = Math.min(lowestCeiling, segment.bottom);
+        }
+      });
+    }
+  }
+
+  if (lowestCeiling !== Number.POSITIVE_INFINITY) {
+    return Math.max(currentFeetY, lowestCeiling - playerCollisionConfig.height);
+  }
+
+  return currentFeetY;
+}
 
 function configurePixelTexture(texture: THREE.Texture) {
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -1164,20 +1330,34 @@ function PlayerArmViewmodel({
 function PlayerController({
   enabled,
   onMovingChange,
+  jumpTick,
 }: {
   enabled: boolean;
   onMovingChange: (moving: boolean) => void;
+  jumpTick: number;
 }) {
   const { camera } = useThree();
   const keysRef = useRef<Record<string, boolean>>({});
   const movingRef = useRef(false);
+  const jumpQueuedRef = useRef(false);
+  const verticalVelocityRef = useRef(0);
+  const groundedRef = useRef(true);
+  const jumpVelocity = 7.1;
+  const gravity = 22;
 
   useEffect(() => {
-    camera.position.set(0, 1.6, 5.5);
+    camera.position.set(0, playerCollisionConfig.eyeHeight, 5.5);
+    verticalVelocityRef.current = 0;
+    groundedRef.current = true;
+    jumpQueuedRef.current = false;
   }, [camera]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        jumpQueuedRef.current = true;
+      }
       keysRef.current[event.code] = true;
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -1193,14 +1373,24 @@ function PlayerController({
   }, []);
 
   useEffect(() => {
+    if (jumpTick === 0) return;
+    jumpQueuedRef.current = true;
+  }, [jumpTick]);
+
+  useEffect(() => {
     if (enabled || !movingRef.current) return;
     movingRef.current = false;
     onMovingChange(false);
-  }, [enabled, onMovingChange]);
+    verticalVelocityRef.current = 0;
+    groundedRef.current = true;
+    jumpQueuedRef.current = false;
+    camera.position.y = playerCollisionConfig.eyeHeight;
+  }, [camera, enabled, onMovingChange]);
 
   useFrame((_state, delta) => {
     if (!enabled) return;
     const speed = 4.25;
+    const currentFeetY = camera.position.y - playerCollisionConfig.eyeHeight;
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     forward.y = 0;
@@ -1220,23 +1410,74 @@ function PlayerController({
       onMovingChange(wantsToMove);
     }
 
-    if (!wantsToMove) return;
-    movement.normalize().multiplyScalar(speed * delta);
+    let nextX = camera.position.x;
+    let nextZ = camera.position.z;
+    let nextFeetY = currentFeetY;
 
-    const candidate = camera.position.clone().add(movement);
-    const cellX = Math.round(candidate.x);
-    const cellZ = Math.round(candidate.z);
-    const blocked = obstacleCells.has(`${cellX}:${cellZ}`);
+    if (wantsToMove) {
+      movement.normalize().multiplyScalar(speed * delta);
 
-    const insideBounds =
-      candidate.x > worldBounds.minX + 1 &&
-      candidate.x < worldBounds.maxX - 1 &&
-      candidate.z > worldBounds.minZ + 1 &&
-      candidate.z < worldBounds.maxZ - 1;
+      const candidateX = camera.position.x + movement.x;
+      const candidateZ = camera.position.z + movement.z;
 
-    if (!blocked && insideBounds) {
-      camera.position.set(candidate.x, 1.6, candidate.z);
+      if (canPlayerOccupyPosition(candidateX, nextFeetY, camera.position.z)) {
+        nextX = candidateX;
+      } else if (groundedRef.current) {
+        const steppedFeetY = findStepUpHeight(candidateX, nextFeetY, camera.position.z);
+        if (steppedFeetY !== null) {
+          nextX = candidateX;
+          nextFeetY = steppedFeetY;
+        }
+      }
+
+      if (canPlayerOccupyPosition(nextX, nextFeetY, candidateZ)) {
+        nextZ = candidateZ;
+      } else if (groundedRef.current) {
+        const steppedFeetY = findStepUpHeight(nextX, nextFeetY, candidateZ);
+        if (steppedFeetY !== null) {
+          nextZ = candidateZ;
+          nextFeetY = steppedFeetY;
+        }
+      }
     }
+
+    if (jumpQueuedRef.current && groundedRef.current) {
+      verticalVelocityRef.current = jumpVelocity;
+      groundedRef.current = false;
+    }
+
+    jumpQueuedRef.current = false;
+    verticalVelocityRef.current -= gravity * delta;
+    const targetFeetY = nextFeetY + verticalVelocityRef.current * delta;
+
+    if (verticalVelocityRef.current > 0) {
+      nextFeetY = resolveUpwardFeetPosition(nextX, nextFeetY, targetFeetY, nextZ);
+      if (nextFeetY < targetFeetY) {
+        verticalVelocityRef.current = 0;
+      }
+      groundedRef.current = false;
+    } else {
+      const supportFeetY = getHighestSupportBelow(nextX, nextFeetY + playerCollisionConfig.stepHeight, nextZ);
+
+      if (targetFeetY <= supportFeetY) {
+        nextFeetY = supportFeetY;
+        verticalVelocityRef.current = 0;
+        groundedRef.current = true;
+      } else {
+        nextFeetY = targetFeetY;
+        const snappedSupportY = getHighestSupportBelow(nextX, nextFeetY + playerCollisionConfig.groundSnapDistance, nextZ);
+
+        if (snappedSupportY >= nextFeetY && snappedSupportY - nextFeetY <= playerCollisionConfig.groundSnapDistance) {
+          nextFeetY = snappedSupportY;
+          verticalVelocityRef.current = 0;
+          groundedRef.current = true;
+        } else {
+          groundedRef.current = false;
+        }
+      }
+    }
+
+    camera.position.set(nextX, nextFeetY + playerCollisionConfig.eyeHeight, nextZ);
   });
 
   return null;
@@ -1325,6 +1566,7 @@ export default function GameScene() {
   const [armSwingTick, setArmSwingTick] = useState(0);
   const [armSwingHeld, setArmSwingHeld] = useState(false);
   const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
+  const [jumpTick, setJumpTick] = useState(0);
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
@@ -1336,6 +1578,10 @@ export default function GameScene() {
 
   const triggerTerrainImpact = useCallback(() => {
     setTerrainImpactTrigger((current) => current + 1);
+  }, []);
+
+  const triggerJump = useCallback(() => {
+    setJumpTick((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -1421,7 +1667,7 @@ export default function GameScene() {
           </Hud>
         ) : null}
 
-        <PlayerController enabled={locked} onMovingChange={setPlayerMoving} />
+        <PlayerController enabled={locked} onMovingChange={setPlayerMoving} jumpTick={jumpTick} />
         <InteractionRaycast onTarget={onTarget} />
         <PointerLockControls
           selector="#enter-world"
@@ -1453,13 +1699,32 @@ export default function GameScene() {
             {locked ? "Exploring" : activePanel ? "Close Panel To Re-enter" : "Enter World"}
           </button>
           <p id="world-controls" className="locked-hint">
-            {locked ? "WASD to move. Click a glowing block to inspect it. Press ESC to free the cursor." : "Cursor unlocked. Use the quick bar or the classic layout if you want the fast path."}
+            {locked ? "WASD to move, Space to jump. Click a glowing block to inspect it. Press ESC to free the cursor." : "Cursor unlocked. Use the quick bar or the classic layout if you want the fast path."}
           </p>
         </section>
 
         <div className="crosshair" aria-hidden="true" />
 
         {targetLabel && locked ? <div className="tooltip">{targetLabel}</div> : null}
+
+        {locked && !activePanel ? (
+          <button
+            type="button"
+            className="jump-button"
+            data-ui-layer="true"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              triggerJump();
+            }}
+            onTouchStart={(event) => {
+              event.preventDefault();
+              triggerJump();
+            }}
+            aria-label="Jump"
+          >
+            Jump
+          </button>
+        ) : null}
 
         <div className="quick-links" data-ui-layer="true">
           <a href="#fallback">Skip 3D / Open standard site</a>
