@@ -1,6 +1,6 @@
 "use client";
 
-import { Hud, PerspectiveCamera, PointerLockControls, useTexture } from "@react-three/drei";
+import { Hud, PerspectiveCamera, PointerLockControls, Text, useTexture } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -243,6 +243,9 @@ const playerCollisionConfig = {
 
 const playerSpawnPosition: [number, number, number] = [0, playerCollisionConfig.eyeHeight + 1, 2.5];
 const playerSpawnRotation: [number, number, number] = [0, Math.PI, 0];
+const linkedinProfileUrl = "https://www.linkedin.com/in/jesse-n-dill/";
+const githubProfileUrl = "https://github.com/JesseDill";
+const googleScholarProfileUrl = "https://scholar.google.com/citations?hl=en&user=t0Lm89kAAAAJ";
 
 const blockedInteractionCells = new Set(landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`));
 
@@ -2122,38 +2125,155 @@ function PlayerController({
   return null;
 }
 
-function InteractionRaycast({ onTarget }: { onTarget: (id: InteractionId | null, label: string | null) => void }) {
+function InteractionRaycast({
+  onTarget,
+}: {
+  onTarget: (id: InteractionId | null, label: string | null, href: string | null) => void;
+}) {
   const { camera, scene } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const lastTargetRef = useRef<{ id: InteractionId | null; label: string | null }>({ id: null, label: null });
+  const lastTargetRef = useRef<{ id: InteractionId | null; label: string | null; href: string | null }>({
+    id: null,
+    label: null,
+    href: null,
+  });
 
   useFrame(() => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     const hits = raycaster.intersectObjects(scene.children, true);
-    const hit = hits.find((entry) => (entry.object.userData?.interactionId as InteractionId | undefined));
+    const hit = hits.find(
+      (entry) =>
+        (entry.object.userData?.interactionId as InteractionId | undefined) ||
+        (entry.object.userData?.externalHref as string | undefined),
+    );
 
     const nextTarget = hit
       ? {
-          id: hit.object.userData.interactionId as InteractionId,
+          id: (hit.object.userData.interactionId as InteractionId | undefined) ?? null,
           label: hit.object.userData.label as string,
+          href: (hit.object.userData.externalHref as string | undefined) ?? null,
         }
-      : { id: null, label: null };
+      : { id: null, label: null, href: null };
 
-    if (lastTargetRef.current.id === nextTarget.id && lastTargetRef.current.label === nextTarget.label) {
+    if (
+      lastTargetRef.current.id === nextTarget.id &&
+      lastTargetRef.current.label === nextTarget.label &&
+      lastTargetRef.current.href === nextTarget.href
+    ) {
       return;
     }
 
     lastTargetRef.current = nextTarget;
 
     if (!hit) {
-      onTarget(null, null);
+      onTarget(null, null, null);
       return;
     }
 
-    onTarget(nextTarget.id, nextTarget.label);
+    onTarget(nextTarget.id, nextTarget.label, nextTarget.href);
   });
 
   return null;
+}
+
+function BillboardSocialSign({
+  label,
+  href,
+  texturePath,
+  position,
+  isActive,
+}: {
+  label: string;
+  href: string;
+  texturePath: string;
+  position: [number, number, number];
+  isActive: boolean;
+}) {
+  const texture = useTexture(texturePath);
+  const signFaceSize = 0.45;
+
+  useEffect(() => {
+    configurePixelTexture(texture);
+  }, [texture]);
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 0, -0.02]} renderOrder={3}>
+        <boxGeometry args={[signFaceSize, signFaceSize, 0.12]} />
+        <meshStandardMaterial color={isActive ? "#d7e6f7" : "#aeb6c4"} roughness={0.9} metalness={0.02} />
+      </mesh>
+      <mesh
+        position={[0, 0, -0.085]}
+        rotation={[0, Math.PI, 0]}
+        userData={{ label, externalHref: href }}
+        renderOrder={4}
+      >
+        <planeGeometry args={[signFaceSize, signFaceSize]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent
+          alphaTest={0.05}
+          toneMapped={false}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function BillboardPhotoSign({ texturePath, position }: { texturePath: string; position: [number, number, number] }) {
+  const texture = useTexture(texturePath);
+  const signWidth = 0.8;
+  const signHeight = 0.8;
+
+  useEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+  }, [texture]);
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 0, -0.02]} renderOrder={3}>
+        <boxGeometry args={[signWidth, signHeight, 0.12]} />
+        <meshStandardMaterial color="#d9dde5" roughness={0.88} metalness={0.02} />
+      </mesh>
+      <mesh position={[0, 0, -0.085]} rotation={[0, Math.PI, 0]} renderOrder={4}>
+        <planeGeometry args={[signWidth, signHeight]} />
+        <meshBasicMaterial
+          map={texture}
+          toneMapped={false}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function BillboardIntroText({ position }: { position: [number, number, number] }) {
+  return (
+    <Text
+      position={position}
+      rotation={[0, Math.PI, 0]}
+      maxWidth={1.55}
+      fontSize={0.14}
+      lineHeight={1.24}
+      anchorX="left"
+      anchorY="middle"
+      color="#f8fafc"
+      outlineColor="#1f2937"
+      outlineWidth={0.012}
+    >
+      {"Hi there!\nFeel free to check out the icons or walk around."}
+    </Text>
+  );
 }
 
 function InteractableLandmark({ id, isActive }: { id: InteractionId; isActive: boolean }) {
@@ -2199,6 +2319,7 @@ function InteractableLandmark({ id, isActive }: { id: InteractionId; isActive: b
 export default function GameScene() {
   const [target, setTarget] = useState<InteractionId | null>(null);
   const [targetLabel, setTargetLabel] = useState<string | null>(null);
+  const [targetHref, setTargetHref] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<InteractionId | null>(null);
   const [locked, setLocked] = useState(false);
   const [playerMoving, setPlayerMoving] = useState(false);
@@ -2220,9 +2341,10 @@ export default function GameScene() {
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
 
-  const onTarget = useCallback((id: InteractionId | null, label: string | null) => {
+  const onTarget = useCallback((id: InteractionId | null, label: string | null, href: string | null) => {
     setTarget(id);
     setTargetLabel(label);
+    setTargetHref(href);
   }, []);
 
   const triggerTerrainImpact = useCallback(() => {
@@ -2329,17 +2451,26 @@ export default function GameScene() {
 
   useEffect(() => {
     const handleClick = () => {
-      if (!locked || !target) return;
+      if (!locked) return;
+
+      if (targetHref) {
+        document.exitPointerLock();
+        window.open(targetHref, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      if (!target) return;
       setActivePanel(target);
       document.exitPointerLock();
     };
 
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
-  }, [locked, target]);
+  }, [locked, target, targetHref]);
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
+      if (targetHref) return;
       if (!locked || event.button !== 0) return;
       setArmSwingHeld(true);
       setArmSwingTick((current) => current + 1);
@@ -2347,7 +2478,7 @@ export default function GameScene() {
 
     window.addEventListener("mousedown", handleMouseDown);
     return () => window.removeEventListener("mousedown", handleMouseDown);
-  }, [locked]);
+  }, [locked, targetHref]);
 
   useEffect(() => {
     const handleMouseUp = (event: MouseEvent) => {
@@ -2428,6 +2559,29 @@ export default function GameScene() {
           onPlaceBlock={placeTerrainBlock}
           onPlaceSwing={triggerPlacementSwing}
         />
+        <BillboardPhotoSign texturePath="/textures/world/jesse_personal_photo.jpeg" position={[0.52, 3.55, 6.49]} />
+        <BillboardIntroText position={[-0.05, 3.55, 6.49]} />
+        <BillboardSocialSign
+          label="LinkedIn"
+          href={linkedinProfileUrl}
+          texturePath="/textures/world/linkedin-logo.svg"
+          position={[0, 2.8, 6.49]}
+          isActive={targetHref === linkedinProfileUrl}
+        />
+        <BillboardSocialSign
+          label="Google Scholar"
+          href={googleScholarProfileUrl}
+          texturePath="/textures/world/google-scholar-logo.svg"
+          position={[0.7, 2.8, 6.49]}
+          isActive={targetHref === googleScholarProfileUrl}
+        />
+        <BillboardSocialSign
+          label="GitHub"
+          href={githubProfileUrl}
+          texturePath="/textures/world/github-logo.svg"
+          position={[-0.7, 2.8, 6.49]}
+          isActive={targetHref === githubProfileUrl}
+        />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
@@ -2457,6 +2611,7 @@ export default function GameScene() {
             setPlayerMoving(false);
             setTarget(null);
             setTargetLabel(null);
+            setTargetHref(null);
             setHoveredInventoryMaterial(null);
           }}
         />
