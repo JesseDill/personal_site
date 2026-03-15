@@ -238,12 +238,26 @@ const playerCollisionConfig = {
 const blockedInteractionCells = new Set(landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`));
 
 let activeRemovedTerrainBlockKeys = new Set<string>();
+let activePlacedTerrainBlocks = new Map<string, WorldBlock>();
+let activePlacedSolidColumns = new Map<string, SolidSegment[]>();
 
-const solidColumns = worldBlocks.reduce(
-  (columns, block) => {
+type SolidSegment = {
+  bottom: number;
+  top: number;
+  cellX: number;
+  cellZ: number;
+  blockKey: string;
+};
+
+function getBlockKey(position: [number, number, number]) {
+  return `${position[0]}:${position[1]}:${position[2]}`;
+}
+
+function buildSolidColumns(blocks: WorldBlock[]) {
+  return blocks.reduce((columns, block) => {
     if (!block.solid) return columns;
 
-    const blockKey = `${block.position[0]}:${block.position[1]}:${block.position[2]}`;
+    const blockKey = getBlockKey(block.position);
     const key = `${Math.round(block.position[0])}:${Math.round(block.position[2])}`;
     const segments = columns.get(key) ?? [];
     segments.push({
@@ -255,9 +269,55 @@ const solidColumns = worldBlocks.reduce(
     });
     columns.set(key, segments);
     return columns;
-  },
-  new Map<string, Array<{ bottom: number; top: number; cellX: number; cellZ: number; blockKey: string }>>(),
-);
+  }, new Map<string, SolidSegment[]>());
+}
+
+const worldTerrainBlockKeys = new Set(worldBlocks.map((block) => getBlockKey(block.position)));
+
+const solidColumns = buildSolidColumns(worldBlocks);
+
+function getSolidColumn(cellX: number, cellZ: number) {
+  const key = `${cellX}:${cellZ}`;
+  return [...(solidColumns.get(key) ?? []), ...(activePlacedSolidColumns.get(key) ?? [])];
+}
+
+function isRemovedTerrainBlockKey(blockKey: string) {
+  return activeRemovedTerrainBlockKeys.has(blockKey) && !activePlacedTerrainBlocks.has(blockKey);
+}
+
+function isOccupiedTerrainBlockKey(blockKey: string) {
+  return activePlacedTerrainBlocks.has(blockKey) || (worldTerrainBlockKeys.has(blockKey) && !activeRemovedTerrainBlockKeys.has(blockKey));
+}
+
+function getPlacementPositionFromHit(hit: CenterTerrainHit): [number, number, number] {
+  const absX = Math.abs(hit.normal.x);
+  const absY = Math.abs(hit.normal.y);
+  const absZ = Math.abs(hit.normal.z);
+
+  if (absX >= absY && absX >= absZ) {
+    return [hit.blockPosition[0] + Math.sign(hit.normal.x || 1), hit.blockPosition[1], hit.blockPosition[2]];
+  }
+
+  if (absY >= absX && absY >= absZ) {
+    return [hit.blockPosition[0], hit.blockPosition[1] + Math.sign(hit.normal.y || 1), hit.blockPosition[2]];
+  }
+
+  return [hit.blockPosition[0], hit.blockPosition[1], hit.blockPosition[2] + Math.sign(hit.normal.z || 1)];
+}
+
+function blockIntersectsPlayer(position: [number, number, number], cameraPosition: THREE.Vector3) {
+  const playerFeetY = cameraPosition.y - playerCollisionConfig.eyeHeight;
+  const bodyBottom = playerFeetY + 0.001;
+  const bodyTop = playerFeetY + playerCollisionConfig.height - 0.001;
+  const blockBottom = position[1] - 0.5;
+  const blockTop = position[1] + 0.5;
+
+  return (
+    overlapsCellFootprint(cameraPosition.x, cameraPosition.z, Math.round(position[0]), Math.round(position[2])) &&
+    blockTop > bodyBottom &&
+    blockBottom < bodyTop
+  );
+}
 
 function getOccupiedCellRange(center: number, radius: number) {
   return {
@@ -284,7 +344,7 @@ function getHighestSupportBelow(x: number, feetY: number, z: number) {
     for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
       if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
 
-      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      const column = getSolidColumn(cellX, cellZ);
       if (!column) continue;
 
       column.forEach((segment) => {
@@ -324,7 +384,7 @@ function canPlayerOccupyPosition(x: number, feetY: number, z: number) {
         return false;
       }
 
-      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      const column = getSolidColumn(cellX, cellZ);
       if (!column) continue;
 
       if (column.some((segment) => !activeRemovedTerrainBlockKeys.has(segment.blockKey) && segment.top > bodyBottom && segment.bottom < bodyTop)) {
@@ -345,7 +405,7 @@ function findStepUpHeight(x: number, currentFeetY: number, z: number) {
     for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
       if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
 
-      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      const column = getSolidColumn(cellX, cellZ);
       if (!column) continue;
 
       column.forEach((segment) => {
@@ -378,7 +438,7 @@ function resolveUpwardFeetPosition(x: number, currentFeetY: number, targetFeetY:
     for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
       if (!overlapsCellFootprint(x, z, cellX, cellZ)) continue;
 
-      const column = solidColumns.get(`${cellX}:${cellZ}`);
+      const column = getSolidColumn(cellX, cellZ);
       if (!column) continue;
 
       column.forEach((segment) => {
@@ -564,7 +624,7 @@ function getCenterTerrainHit(raycaster: THREE.Raycaster, camera: THREE.Camera, s
 
   const blockKey = `${blockPosition.x}:${blockPosition.y}:${blockPosition.z}`;
 
-  if (activeRemovedTerrainBlockKeys.has(blockKey)) {
+  if (isRemovedTerrainBlockKey(blockKey)) {
     return null;
   }
 
@@ -1154,14 +1214,11 @@ function InstancedVoxelBlocks({
   );
 }
 
-function VoxelWorld({ removedBlockKeys }: { removedBlockKeys: Set<string> }) {
+function VoxelWorld({ blocks }: { blocks: WorldBlock[] }) {
   const texturesByPath = useWorldTextures();
   const groupedBlocks = useMemo(
-    () =>
-      groupBlocksByMaterial(
-        worldBlocks.filter((block) => !removedBlockKeys.has(`${block.position[0]}:${block.position[1]}:${block.position[2]}`)),
-      ),
-    [removedBlockKeys],
+    () => groupBlocksByMaterial(blocks),
+    [blocks],
   );
   const faceTexturesByMaterial = useMemo(
     () =>
@@ -1560,7 +1617,7 @@ function TerrainBreakOverlay({
 
     const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
 
-    if (!terrainHit || removedBlockKeys.has(terrainHit.blockKey)) return;
+    if (!terrainHit || (removedBlockKeys.has(terrainHit.blockKey) && !activePlacedTerrainBlocks.has(terrainHit.blockKey))) return;
 
     setOverlayState((current) => {
       if (current?.blockKey === terrainHit.blockKey) {
@@ -1581,7 +1638,7 @@ function TerrainBreakOverlay({
   }, [camera, enabled, raycaster, removedBlockKeys, scene, trigger]);
 
   useEffect(() => {
-    if (!overlayState || removedBlockKeys.has(overlayState.blockKey)) return;
+    if (!overlayState || (removedBlockKeys.has(overlayState.blockKey) && !activePlacedTerrainBlocks.has(overlayState.blockKey))) return;
     if (overlayState.hits < blockBreakHitsRequired[overlayState.terrainMaterial]) return;
 
     onBreakBlock({
@@ -1602,7 +1659,7 @@ function TerrainBreakOverlay({
 
     setOverlayState((current) => {
       if (!current) return current;
-      if (removedBlockKeys.has(current.blockKey) || !terrainHit || terrainHit.blockKey !== current.blockKey) {
+      if ((removedBlockKeys.has(current.blockKey) && !activePlacedTerrainBlocks.has(current.blockKey)) || !terrainHit || terrainHit.blockKey !== current.blockKey) {
         return null;
       }
 
@@ -1655,15 +1712,84 @@ function TerrainBreakOverlay({
   );
 }
 
+function BlockPlacementController({
+  enabled,
+  heldInventoryMaterial,
+  availableCount,
+  onPlaceBlock,
+  onPlaceSwing,
+}: {
+  enabled: boolean;
+  heldInventoryMaterial: DroppedBlockItem["material"] | null;
+  availableCount: number;
+  onPlaceBlock: (material: DroppedBlockItem["material"], blockPosition: [number, number, number]) => void;
+  onPlaceSwing: () => void;
+}) {
+  const { camera, scene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+
+  const tryPlaceBlock = useCallback(() => {
+    if (!enabled || !heldInventoryMaterial || availableCount <= 0) return;
+
+    const terrainHit = getCenterTerrainHit(raycaster, camera, scene, terrainImpactConfig.maxDistance);
+    if (!terrainHit) return;
+
+    const blockPosition = getPlacementPositionFromHit(terrainHit);
+    const blockKey = getBlockKey(blockPosition);
+
+    if (
+      blockPosition[0] < worldBounds.minX ||
+      blockPosition[0] > worldBounds.maxX ||
+      blockPosition[2] < worldBounds.minZ ||
+      blockPosition[2] > worldBounds.maxZ
+    ) {
+      return;
+    }
+
+    if (isOccupiedTerrainBlockKey(blockKey) || blockIntersectsPlayer(blockPosition, camera.position)) {
+      return;
+    }
+
+    onPlaceBlock(heldInventoryMaterial, blockPosition);
+    onPlaceSwing();
+  }, [availableCount, camera, enabled, heldInventoryMaterial, onPlaceBlock, onPlaceSwing, raycaster, scene]);
+
+  useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => {
+      if (!enabled || !heldInventoryMaterial || availableCount <= 0) return;
+      event.preventDefault();
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 2) return;
+      if (!enabled || !heldInventoryMaterial || availableCount <= 0) return;
+
+      event.preventDefault();
+      tryPlaceBlock();
+    };
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("mousedown", handleMouseDown);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [availableCount, enabled, heldInventoryMaterial, tryPlaceBlock]);
+
+  return null;
+}
+
 function PlayerArmViewmodel({
   moving,
   swingTick,
+  placeSwingTick,
   swingHeld,
   onSwingCycle,
   heldInventoryMaterial,
 }: {
   moving: boolean;
   swingTick: number;
+  placeSwingTick: number;
   swingHeld: boolean;
   onSwingCycle: () => void;
   heldInventoryMaterial: DroppedBlockItem["material"] | null;
@@ -1688,6 +1814,11 @@ function PlayerArmViewmodel({
     swingProgressRef.current = 0;
     onSwingCycle();
   }, [onSwingCycle, swingTick]);
+
+  useEffect(() => {
+    if (placeSwingTick === 0) return;
+    swingProgressRef.current = 0;
+  }, [placeSwingTick]);
 
   useFrame((_state, delta) => {
     if (!armRef.current) return;
@@ -2043,10 +2174,12 @@ export default function GameScene() {
   const [locked, setLocked] = useState(false);
   const [playerMoving, setPlayerMoving] = useState(false);
   const [armSwingTick, setArmSwingTick] = useState(0);
+  const [placeSwingTick, setPlaceSwingTick] = useState(0);
   const [armSwingHeld, setArmSwingHeld] = useState(false);
   const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
   const [jumpTick, setJumpTick] = useState(0);
   const [removedTerrainBlockKeys, setRemovedTerrainBlockKeys] = useState<Set<string>>(() => new Set());
+  const [placedTerrainBlocks, setPlacedTerrainBlocks] = useState<WorldBlock[]>([]);
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
   const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<DroppedBlockItem["material"] | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
@@ -2067,15 +2200,23 @@ export default function GameScene() {
     setTerrainImpactTrigger((current) => current + 1);
   }, []);
 
+  const triggerPlacementSwing = useCallback(() => {
+    setPlaceSwingTick((current) => current + 1);
+  }, []);
+
   const triggerJump = useCallback(() => {
     setJumpTick((current) => current + 1);
   }, []);
 
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
-    if (activeRemovedTerrainBlockKeys.has(block.blockKey)) return;
+    if (activePlacedTerrainBlocks.has(block.blockKey)) {
+      setPlacedTerrainBlocks((current) => current.filter((entry) => getBlockKey(entry.position) !== block.blockKey));
+    } else {
+      if (activeRemovedTerrainBlockKeys.has(block.blockKey)) return;
 
-    activeRemovedTerrainBlockKeys = new Set(activeRemovedTerrainBlockKeys).add(block.blockKey);
-    setRemovedTerrainBlockKeys(activeRemovedTerrainBlockKeys);
+      activeRemovedTerrainBlockKeys = new Set(activeRemovedTerrainBlockKeys).add(block.blockKey);
+      setRemovedTerrainBlockKeys(activeRemovedTerrainBlockKeys);
+    }
 
     const droppedMaterial =
       block.terrainMaterial === "wood"
@@ -2112,9 +2253,32 @@ export default function GameScene() {
     }));
   }, []);
 
+  const placeTerrainBlock = useCallback((material: DroppedBlockItem["material"], blockPosition: [number, number, number]) => {
+    const blockKey = getBlockKey(blockPosition);
+    const worldMaterial: Extract<WorldMaterial, "dirt" | "wood"> = material === "wood" ? "wood" : "dirt";
+
+    setCollectedInventory((current) => {
+      if (current[material] <= 0) return current;
+      return {
+        ...current,
+        [material]: current[material] - 1,
+      };
+    });
+
+    setPlacedTerrainBlocks((current) => {
+      if (current.some((entry) => getBlockKey(entry.position) === blockKey)) return current;
+      return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
+    });
+  }, []);
+
   useEffect(() => {
     activeRemovedTerrainBlockKeys = removedTerrainBlockKeys;
   }, [removedTerrainBlockKeys]);
+
+  useEffect(() => {
+    activePlacedTerrainBlocks = new Map(placedTerrainBlocks.map((block) => [getBlockKey(block.position), block]));
+    activePlacedSolidColumns = buildSolidColumns(placedTerrainBlocks);
+  }, [placedTerrainBlocks]);
 
   useEffect(() => {
     const handleHotbarKeyDown = (event: KeyboardEvent) => {
@@ -2183,6 +2347,13 @@ export default function GameScene() {
   );
   const selectedInventoryMaterial = visibleInventoryMaterials[selectedInventorySlot] ?? null;
   const heldInventoryMaterial = hoveredInventoryMaterial ?? selectedInventoryMaterial;
+  const visibleTerrainBlocks = useMemo(
+    () => [
+      ...worldBlocks.filter((block) => !removedTerrainBlockKeys.has(getBlockKey(block.position))),
+      ...placedTerrainBlocks,
+    ],
+    [placedTerrainBlocks, removedTerrainBlockKeys],
+  );
 
   const content = activePanel ? interactionContent[activePanel] : null;
 
@@ -2209,7 +2380,7 @@ export default function GameScene() {
           hemisphereLightRef={hemisphereLightRef}
           directionalLightRef={directionalLightRef}
         />
-        <VoxelWorld removedBlockKeys={removedTerrainBlockKeys} />
+        <VoxelWorld blocks={visibleTerrainBlocks} />
         <DroppedBlockItems items={droppedItems} canCollect={locked && !activePanel} onCollect={collectDroppedItem} />
         <TerrainImpactParticles trigger={terrainImpactTrigger} enabled={locked && !activePanel} />
         <TerrainBreakOverlay
@@ -2218,6 +2389,13 @@ export default function GameScene() {
           swingHeld={armSwingHeld}
           removedBlockKeys={removedTerrainBlockKeys}
           onBreakBlock={removeTerrainBlock}
+        />
+        <BlockPlacementController
+          enabled={locked && !activePanel}
+          heldInventoryMaterial={heldInventoryMaterial}
+          availableCount={heldInventoryMaterial ? collectedInventory[heldInventoryMaterial] : 0}
+          onPlaceBlock={placeTerrainBlock}
+          onPlaceSwing={triggerPlacementSwing}
         />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
@@ -2229,6 +2407,7 @@ export default function GameScene() {
             <PlayerArmViewmodel
               moving={playerMoving}
               swingTick={armSwingTick}
+              placeSwingTick={placeSwingTick}
               swingHeld={armSwingHeld}
               onSwingCycle={triggerTerrainImpact}
               heldInventoryMaterial={heldInventoryMaterial}
@@ -2270,7 +2449,7 @@ export default function GameScene() {
               {locked ? "Exploring" : activePanel ? "Close Panel To Re-enter" : "Enter World"}
             </button>
             <p id="world-controls" className="locked-hint">
-              {locked ? "WASD to move, Space to jump. Click a glowing block to inspect it. Press ESC to free the cursor." : "Cursor unlocked. Enter the world to explore the interactive blocks."}
+              {locked ? "WASD to move, Space to jump. Left click to mine and right click to place the selected block. Press ESC to free the cursor." : "Cursor unlocked. Enter the world to explore the interactive blocks."}
             </p>
           </section>
         ) : null}
