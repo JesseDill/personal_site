@@ -187,6 +187,21 @@ const uniqueArmTexturePaths = Array.from(
   ),
 );
 
+const terrainImpactMaterials = (Object.keys(materialPalette) as WorldMaterial[]).filter(
+  (material): material is Exclude<WorldMaterial, "cloud"> => material !== "cloud",
+);
+
+const terrainImpactConfig = {
+  maxDistance: 4,
+  particlesPerBurst: 12,
+  maxParticlesPerMaterial: 64,
+  fragmentSize: 0.05,
+  gravity: 6.4,
+  burstVelocity: 1.05,
+  randomVelocity: 0.75,
+  angularVelocity: 8,
+} as const;
+
 function configurePixelTexture(texture: THREE.Texture) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.NearestFilter;
@@ -711,11 +726,13 @@ function SkySystem({
 }
 
 function InstancedVoxelBlocks({
+  materialId,
   positions,
   material,
   faceTextures,
   castShadow = true,
 }: {
+  materialId: WorldMaterial;
   positions: [number, number, number][];
   material: MaterialDefinition;
   faceTextures: THREE.Texture[];
@@ -749,6 +766,9 @@ function InstancedVoxelBlocks({
       castShadow={castShadow}
       receiveShadow
       frustumCulled={false}
+      userData={{
+        terrainMaterial: materialId,
+      }}
     >
       <boxGeometry args={[1, 1, 1]} />
       {faceTextures.map((texture, index) => (
@@ -787,6 +807,7 @@ function VoxelWorld() {
       {(Object.keys(groupedWorldBlocks) as WorldMaterial[]).map((material) => (
         <InstancedVoxelBlocks
           key={material}
+          materialId={material}
           positions={groupedWorldBlocks[material]}
           material={materialPalette[material]}
           faceTextures={faceTexturesByMaterial[material]}
@@ -797,14 +818,236 @@ function VoxelWorld() {
   );
 }
 
+function TerrainImpactParticles({ trigger, enabled }: { trigger: number; enabled: boolean }) {
+  const { camera, scene } = useThree();
+  const texturesByPath = useWorldTextures();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const meshRefs = useRef({} as Record<Exclude<WorldMaterial, "cloud">, THREE.InstancedMesh | null>);
+  const poolsRef = useRef(
+    Object.fromEntries(
+      terrainImpactMaterials.map((material) => [
+        material,
+        {
+          positions: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => new THREE.Vector3(9999, 9999, 9999)),
+          velocities: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => new THREE.Vector3(9999, 9999, 9999)),
+          rotations: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => new THREE.Euler()),
+          angularVelocities: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => new THREE.Vector3()),
+          lifetimes: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => ({ age: 1, ttl: 0 })),
+          nextParticle: 0,
+        },
+      ]),
+    ) as Record<
+      Exclude<WorldMaterial, "cloud">,
+      {
+        positions: THREE.Vector3[];
+        velocities: THREE.Vector3[];
+        rotations: THREE.Euler[];
+        angularVelocities: THREE.Vector3[];
+        lifetimes: Array<{ age: number; ttl: number }>;
+        nextParticle: number;
+      }
+    >,
+  );
+  const spawnOriginRef = useRef(new THREE.Vector3());
+  const spawnNormalRef = useRef(new THREE.Vector3(0, 1, 0));
+  const tangentRef = useRef(new THREE.Vector3());
+  const bitangentRef = useRef(new THREE.Vector3());
+  const randomDirectionRef = useRef(new THREE.Vector3());
+  const normalMatrixRef = useRef(new THREE.Matrix3());
+  const hiddenScale = 0.0001;
+
+  const fragmentTexturesByMaterial = useMemo(
+    () =>
+      Object.fromEntries(
+        terrainImpactMaterials.map((material) => [
+          material,
+          cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths[material][face]]),
+        ]),
+      ) as Record<Exclude<WorldMaterial, "cloud">, THREE.Texture[]>,
+    [texturesByPath],
+  );
+
+  const syncPoolMesh = useCallback(
+    (material: Exclude<WorldMaterial, "cloud">) => {
+      const mesh = meshRefs.current[material];
+      const pool = poolsRef.current[material];
+
+      if (!mesh) return;
+
+      for (let index = 0; index < terrainImpactConfig.maxParticlesPerMaterial; index += 1) {
+        const lifetime = pool.lifetimes[index];
+        const scale =
+          lifetime.age >= lifetime.ttl
+            ? hiddenScale
+            : terrainImpactConfig.fragmentSize * (1 - THREE.MathUtils.smoothstep(lifetime.age / lifetime.ttl, 0, 1) * 0.35);
+
+        dummy.position.copy(pool.positions[index]);
+        dummy.rotation.copy(pool.rotations[index]);
+        dummy.scale.setScalar(scale);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+      }
+
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    },
+    [dummy, hiddenScale],
+  );
+
+  useEffect(() => {
+    terrainImpactMaterials.forEach((material) => {
+      syncPoolMesh(material);
+    });
+  }, [syncPoolMesh]);
+
+  useEffect(() => {
+    if (!enabled || trigger === 0) return;
+
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const hit = raycaster
+      .intersectObjects(scene.children, true)
+      .find(
+        (entry) =>
+          (entry.object.userData?.terrainMaterial as WorldMaterial | undefined) &&
+          entry.distance <= terrainImpactConfig.maxDistance,
+      );
+
+    if (!hit) return;
+
+    const terrainMaterial = hit.object.userData?.terrainMaterial as WorldMaterial | undefined;
+
+    if (!terrainMaterial || terrainMaterial === "cloud") return;
+
+    const pool = poolsRef.current[terrainMaterial];
+
+    spawnOriginRef.current.copy(hit.point);
+    spawnNormalRef.current.copy(hit.face?.normal ?? new THREE.Vector3(0, 1, 0));
+    normalMatrixRef.current.getNormalMatrix(hit.object.matrixWorld);
+    spawnNormalRef.current.applyMatrix3(normalMatrixRef.current).normalize();
+
+    const tangentSeed =
+      Math.abs(spawnNormalRef.current.y) > 0.82 ? tangentRef.current.set(1, 0, 0) : tangentRef.current.set(0, 1, 0);
+
+    tangentRef.current.crossVectors(spawnNormalRef.current, tangentSeed).normalize();
+    bitangentRef.current.crossVectors(spawnNormalRef.current, tangentRef.current).normalize();
+
+    for (let index = 0; index < terrainImpactConfig.particlesPerBurst; index += 1) {
+      const particleIndex = pool.nextParticle;
+      pool.nextParticle = (pool.nextParticle + 1) % terrainImpactConfig.maxParticlesPerMaterial;
+      const offsetA = (Math.random() - 0.5) * 0.18;
+      const offsetB = (Math.random() - 0.5) * 0.18;
+
+      pool.positions[particleIndex].set(
+        spawnOriginRef.current.x + spawnNormalRef.current.x * 0.08 + tangentRef.current.x * offsetA + bitangentRef.current.x * offsetB,
+        spawnOriginRef.current.y + spawnNormalRef.current.y * 0.08 + tangentRef.current.y * offsetA + bitangentRef.current.y * offsetB,
+        spawnOriginRef.current.z + spawnNormalRef.current.z * 0.08 + tangentRef.current.z * offsetA + bitangentRef.current.z * offsetB,
+      );
+
+      randomDirectionRef.current.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize();
+      pool.velocities[particleIndex]
+        .copy(spawnNormalRef.current)
+        .multiplyScalar(terrainImpactConfig.burstVelocity)
+        .addScaledVector(randomDirectionRef.current, terrainImpactConfig.randomVelocity);
+      pool.rotations[particleIndex].set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      pool.angularVelocities[particleIndex].set(
+        (Math.random() - 0.5) * terrainImpactConfig.angularVelocity,
+        (Math.random() - 0.5) * terrainImpactConfig.angularVelocity,
+        (Math.random() - 0.5) * terrainImpactConfig.angularVelocity,
+      );
+
+      pool.lifetimes[particleIndex] = {
+        age: 0,
+        ttl: 0.18 + Math.random() * 0.22,
+      };
+    }
+
+    syncPoolMesh(terrainMaterial);
+  }, [camera, enabled, raycaster, scene, syncPoolMesh, trigger]);
+
+  useFrame((_state, delta) => {
+    terrainImpactMaterials.forEach((material) => {
+      const pool = poolsRef.current[material];
+      let materialNeedsUpdate = false;
+
+      for (let index = 0; index < terrainImpactConfig.maxParticlesPerMaterial; index += 1) {
+        const lifetime = pool.lifetimes[index];
+
+        if (lifetime.age >= lifetime.ttl) {
+          continue;
+        }
+
+        lifetime.age += delta;
+
+        if (lifetime.age >= lifetime.ttl) {
+          pool.positions[index].set(9999, 9999, 9999);
+          materialNeedsUpdate = true;
+          continue;
+        }
+
+        pool.velocities[index].y -= terrainImpactConfig.gravity * delta;
+        pool.positions[index].addScaledVector(pool.velocities[index], delta);
+        pool.rotations[index].x += pool.angularVelocities[index].x * delta;
+        pool.rotations[index].y += pool.angularVelocities[index].y * delta;
+        pool.rotations[index].z += pool.angularVelocities[index].z * delta;
+        materialNeedsUpdate = true;
+      }
+
+      if (materialNeedsUpdate) {
+        syncPoolMesh(material);
+      }
+    });
+  }, 0);
+
+  return (
+    <>
+      {terrainImpactMaterials.map((material) => (
+        (() => {
+          const materialDefinition: MaterialDefinition = materialPalette[material];
+
+          return (
+            <instancedMesh
+              key={`terrain-impact-${material}`}
+              ref={(node) => {
+                meshRefs.current[material] = node;
+              }}
+              args={[undefined, undefined, terrainImpactConfig.maxParticlesPerMaterial]}
+              frustumCulled={false}
+              renderOrder={5}
+            >
+              <boxGeometry args={[1, 1, 1]} />
+              {fragmentTexturesByMaterial[material].map((texture, index) => (
+                <meshStandardMaterial
+                  key={`terrain-impact-${material}-${index}-${texture.uuid}`}
+                  attach={`material-${index}`}
+                  map={texture}
+                  color="#ffffff"
+                  roughness={materialDefinition.roughness ?? 1}
+                  metalness={materialDefinition.metalness ?? 0}
+                  emissive={materialDefinition.emissive}
+                  emissiveIntensity={materialDefinition.emissiveIntensity}
+                  transparent={materialDefinition.transparent}
+                  alphaTest={materialDefinition.alphaTest ?? 0}
+                />
+              ))}
+            </instancedMesh>
+          );
+        })()
+      ))}
+    </>
+  );
+}
+
 function PlayerArmViewmodel({
   moving,
   swingTick,
   swingHeld,
+  onSwingCycle,
 }: {
   moving: boolean;
   swingTick: number;
   swingHeld: boolean;
+  onSwingCycle: () => void;
 }) {
   const armRef = useRef<THREE.Group>(null);
   const bobPhaseRef = useRef(0);
@@ -820,7 +1063,8 @@ function PlayerArmViewmodel({
 
   useEffect(() => {
     swingProgressRef.current = 0;
-  }, [swingTick]);
+    onSwingCycle();
+  }, [onSwingCycle, swingTick]);
 
   useFrame((_state, delta) => {
     if (!armRef.current) return;
@@ -830,7 +1074,12 @@ function PlayerArmViewmodel({
     swingProgressRef.current += delta / swing_duration;
 
     if (swingProgressRef.current >= 1) {
-      swingProgressRef.current = swingHeld ? 0 : 1;
+      if (swingHeld) {
+        swingProgressRef.current = 0;
+        onSwingCycle();
+      } else {
+        swingProgressRef.current = 1;
+      }
     }
 
     const bobX = Math.sin(bobPhaseRef.current) * 0.05 * bobBlendRef.current;
@@ -1075,6 +1324,7 @@ export default function GameScene() {
   const [playerMoving, setPlayerMoving] = useState(false);
   const [armSwingTick, setArmSwingTick] = useState(0);
   const [armSwingHeld, setArmSwingHeld] = useState(false);
+  const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
@@ -1082,6 +1332,10 @@ export default function GameScene() {
   const onTarget = useCallback((id: InteractionId | null, label: string | null) => {
     setTarget(id);
     setTargetLabel(label);
+  }, []);
+
+  const triggerTerrainImpact = useCallback(() => {
+    setTerrainImpactTrigger((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -1150,6 +1404,7 @@ export default function GameScene() {
           directionalLightRef={directionalLightRef}
         />
         <VoxelWorld />
+        <TerrainImpactParticles trigger={terrainImpactTrigger} enabled={locked && !activePanel} />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
@@ -1157,7 +1412,12 @@ export default function GameScene() {
         {locked && !activePanel ? (
           <Hud renderPriority={1}>
             <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={48} />
-            <PlayerArmViewmodel moving={playerMoving} swingTick={armSwingTick} swingHeld={armSwingHeld} />
+            <PlayerArmViewmodel
+              moving={playerMoving}
+              swingTick={armSwingTick}
+              swingHeld={armSwingHeld}
+              onSwingCycle={triggerTerrainImpact}
+            />
           </Hud>
         ) : null}
 
