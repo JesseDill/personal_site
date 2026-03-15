@@ -440,6 +440,36 @@ const collectedInventoryConfig = {
 
 const collectedInventoryMaterials = Object.keys(collectedInventoryConfig) as DroppedBlockItem["material"][];
 const hotbarSlotCount = 9;
+const hotbarPreviewTexturePaths = Array.from(
+  new Set(collectedInventoryMaterials.flatMap((material) => collectedInventoryConfig[material].faceTextures)),
+);
+
+function useHotbarPreviewTextures() {
+  const textures = useTexture(hotbarPreviewTexturePaths) as THREE.Texture[];
+
+  useEffect(() => {
+    textures.forEach((texture) => {
+      configurePixelTexture(texture);
+    });
+  }, [textures]);
+
+  const texturesByPath = useMemo(
+    () =>
+      Object.fromEntries(hotbarPreviewTexturePaths.map((path, index) => [path, textures[index]])) as Record<string, THREE.Texture>,
+    [textures],
+  );
+
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        collectedInventoryMaterials.map((material) => [
+          material,
+          collectedInventoryConfig[material].faceTextures.map((path) => texturesByPath[path]),
+        ]),
+      ) as Record<DroppedBlockItem["material"], THREE.Texture[]>,
+    [texturesByPath],
+  );
+}
 
 function InventoryVoxelIcon({ material }: { material: DroppedBlockItem["material"] }) {
   const config = collectedInventoryConfig[material];
@@ -1630,19 +1660,25 @@ function PlayerArmViewmodel({
   swingTick,
   swingHeld,
   onSwingCycle,
+  heldInventoryMaterial,
 }: {
   moving: boolean;
   swingTick: number;
   swingHeld: boolean;
   onSwingCycle: () => void;
+  heldInventoryMaterial: DroppedBlockItem["material"] | null;
 }) {
   const armRef = useRef<THREE.Group>(null);
   const bobPhaseRef = useRef(0);
   const bobBlendRef = useRef(0);
   const swingProgressRef = useRef(1);
   const armTextures = useArmTextures();
+  const hotbarPreviewTextures = useHotbarPreviewTextures();
   const arm_rotation: [number, number, number] = [-0.55, 0.22, -0.08];
   const arm_position: [number, number, number] = [0.98, -1.14, 0];
+  const held_block_position: [number, number, number] = [0.05, -0.15, 0] //[0.28, -0.8, 0.36];
+  const held_block_rotation: [number, number, number] = [0.8, 1.1, .3];
+  const held_block_scale = 0.72;
   const swing_duration = 0.22;
 
   const swing_position_delta: [number, number, number] = [-0.1, -0.12, -0.5];
@@ -1695,7 +1731,7 @@ function PlayerArmViewmodel({
           To rotate the arm in toward the screen center, usually adjust rotation[1].
           To rotate it farther out toward the screen edge, adjust rotation[1] the opposite way. */}
       <group ref={armRef} position={[0.88, -0.96, 0]} rotation={arm_rotation} scale={1.45}>
-        <group>
+        <group visible={!heldInventoryMaterial}>
           <mesh frustumCulled={false} position={[0.02, -0.24, -0.006]}>
             <boxGeometry args={[0.29, 1.04, 0.29]} />
             {armTextures.skin.map((texture, index) => (
@@ -1743,6 +1779,28 @@ function PlayerArmViewmodel({
             </mesh>
           ) : null}
         </group>
+        {heldInventoryMaterial ? (
+          <mesh
+            frustumCulled={false}
+            position={held_block_position}
+            rotation={held_block_rotation}
+            scale={held_block_scale}
+            renderOrder={6}
+          >
+            <boxGeometry args={[1, 1, 1]} />
+            {hotbarPreviewTextures[heldInventoryMaterial].map((texture, index) => (
+              <meshBasicMaterial
+                key={`arm-preview-${heldInventoryMaterial}-${index}-${texture.uuid}`}
+                attach={`material-${index}`}
+                map={texture}
+                color="#ffffff"
+                depthTest
+                depthWrite
+                toneMapped={false}
+              />
+            ))}
+          </mesh>
+        ) : null}
       </group>
     </>
   );
@@ -1990,6 +2048,7 @@ export default function GameScene() {
   const [jumpTick, setJumpTick] = useState(0);
   const [removedTerrainBlockKeys, setRemovedTerrainBlockKeys] = useState<Set<string>>(() => new Set());
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
+  const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<DroppedBlockItem["material"] | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
     dirt: 0,
@@ -2113,6 +2172,18 @@ export default function GameScene() {
     };
   }, []);
 
+  useEffect(() => {
+    if (locked && !activePanel) return;
+    setHoveredInventoryMaterial(null);
+  }, [activePanel, locked]);
+
+  const visibleInventoryMaterials = useMemo(
+    () => collectedInventoryMaterials.filter((material) => collectedInventory[material] > 0),
+    [collectedInventory],
+  );
+  const selectedInventoryMaterial = visibleInventoryMaterials[selectedInventorySlot] ?? null;
+  const heldInventoryMaterial = hoveredInventoryMaterial ?? selectedInventoryMaterial;
+
   const content = activePanel ? interactionContent[activePanel] : null;
 
   return (
@@ -2152,7 +2223,7 @@ export default function GameScene() {
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
 
-        {locked && !activePanel ? (
+        {(locked || heldInventoryMaterial) && !activePanel ? (
           <Hud renderPriority={1}>
             <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={48} />
             <PlayerArmViewmodel
@@ -2160,6 +2231,7 @@ export default function GameScene() {
               swingTick={armSwingTick}
               swingHeld={armSwingHeld}
               onSwingCycle={triggerTerrainImpact}
+              heldInventoryMaterial={heldInventoryMaterial}
             />
           </Hud>
         ) : null}
@@ -2175,6 +2247,7 @@ export default function GameScene() {
             setPlayerMoving(false);
             setTarget(null);
             setTargetLabel(null);
+            setHoveredInventoryMaterial(null);
           }}
         />
       </Canvas>
@@ -2210,14 +2283,23 @@ export default function GameScene() {
           <p className="collected-inventory-title">Collected</p>
           <div className="collected-inventory-grid">
             {Array.from({ length: hotbarSlotCount }, (_, index) => {
-              const visibleMaterials = collectedInventoryMaterials.filter((material) => collectedInventory[material] > 0);
-              const material = visibleMaterials[index] ?? null;
+              const material = visibleInventoryMaterials[index] ?? null;
 
               return (
               <div
                 key={material ?? `empty-slot-${index}`}
                 className={`collected-slot${selectedInventorySlot === index ? " selected" : ""}`}
                 aria-selected={selectedInventorySlot === index}
+                onClick={() => {
+                  setSelectedInventorySlot(index);
+                  setHoveredInventoryMaterial(material);
+                }}
+                onMouseEnter={() => {
+                  if (material) setHoveredInventoryMaterial(material);
+                }}
+                onMouseLeave={() => {
+                  setHoveredInventoryMaterial((current) => (current === material ? null : current));
+                }}
               >
                 {material ? (
                   <>
