@@ -3,9 +3,13 @@
 import { hotbarSlotCount } from "../config/inventory";
 import type { DroppedBlockItem } from "../types";
 import { InventoryVoxelIcon } from "./InventoryVoxelIcon";
+import { MinecraftPauseMenu, MinecraftTitleScreen } from "./MinecraftGameMenus";
 
 type GameWorldHudProps = {
   locked: boolean;
+  /** True after the player has entered the world at least once this session and is now unlocked (Esc). */
+  isPaused: boolean;
+  onQuitToTitle: () => void;
   activePanel: boolean;
   targetLabel: string | null;
   hotbarSlots: (DroppedBlockItem["material"] | null)[];
@@ -18,6 +22,8 @@ type GameWorldHudProps = {
 
 export function GameWorldHud({
   locked,
+  isPaused,
+  onQuitToTitle,
   activePanel,
   targetLabel,
   hotbarSlots,
@@ -29,35 +35,18 @@ export function GameWorldHud({
 }: GameWorldHudProps) {
   return (
     <div className="hud">
-      {!locked ? (
-        <section className="status-card" data-ui-layer="true" aria-label="World controls">
-          <p className="eyebrow">Voxel portfolio prototype</p>
-          <h1 className="title">Portfolio Craft</h1>
-          <p className="subtitle">
-            Explore a handcrafted block world, aim at a landmark, and click to open the matching section.
-          </p>
-          <button
-            id="enter-world"
-            type="button"
-            className="enter-world"
-            disabled={locked || activePanel}
-            aria-describedby="world-controls"
-          >
-            {locked ? "Exploring" : activePanel ? "Close Panel To Re-enter" : "Enter World"}
-          </button>
-          <p id="world-controls" className="locked-hint">
-            {locked
-              ? "WASD to move, Space to jump. Left click to mine and right click to place the selected block. Press ESC to free the cursor."
-              : "Cursor unlocked. Enter the world to explore the interactive blocks."}
-          </p>
-        </section>
-      ) : null}
+      {!locked && !isPaused ? <MinecraftTitleScreen activePanel={activePanel} /> : null}
+      {!locked && isPaused ? <MinecraftPauseMenu activePanel={activePanel} onQuitToTitle={onQuitToTitle} /> : null}
 
-      <div className="crosshair" aria-hidden="true" />
+      <div className={`crosshair${!locked ? " crosshair--hidden" : ""}`} aria-hidden="true" />
 
       {targetLabel && locked ? <div className="tooltip">{targetLabel}</div> : null}
 
-      <section className="collected-inventory" aria-label="Collected block inventory" data-ui-layer="true">
+      <section
+        className={`collected-inventory${isPaused ? " collected-inventory--pause-front" : ""}`}
+        aria-label="Collected block inventory"
+        data-ui-layer="true"
+      >
         <p className="collected-inventory-title">Collected</p>
         <div className="collected-inventory-grid">
           {Array.from({ length: hotbarSlotCount }, (_, index) => {
@@ -91,13 +80,6 @@ export function GameWorldHud({
           })}
         </div>
       </section>
-
-      {!locked ? (
-        <div className="quick-links" data-ui-layer="true">
-          <a href="#fallback">Skip 3D / Open standard site</a>
-          <a href="mailto:hello@example.com">Contact</a>
-        </div>
-      ) : null}
     </div>
   );
 }

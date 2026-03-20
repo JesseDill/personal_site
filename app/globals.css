@@ -83,7 +83,9 @@ a {
 .inventory,
 .panel,
 .jump-button,
-.collected-inventory {
+.collected-inventory,
+.mc-pause-dim,
+.mc-menu-root {
   pointer-events: auto;
 }
 
@@ -248,6 +250,7 @@ a {
   bottom: var(--hotbar-bottom);
   transform: translateX(-50%);
   width: fit-content;
+  z-index: 4;
   background: rgba(36, 40, 46, 0.44);
   border: 2px solid rgba(154, 161, 173, 0.62);
   box-shadow: 0 4px 0 rgba(16, 18, 22, 0.22);
@@ -369,6 +372,7 @@ a {
   position: absolute;
   right: 1rem;
   bottom: 7.3rem;
+  z-index: 8;
   width: min(360px, calc(100% - 2rem));
   background: var(--paper);
   border: 4px solid var(--earth);
@@ -508,4 +512,147 @@ a {
   .fallback {
     padding-top: 3rem;
   }
+}
+
+/* --- Minecraft-style game menu (pause + title) --- */
+
+.mc-pause-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.52);
+  pointer-events: auto;
+  backdrop-filter: grayscale(0.35) brightness(0.72);
+}
+
+.mc-menu-root {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(440px, calc(100% - 2rem));
+}
+
+.mc-menu-root--title {
+  top: 46%;
+}
+
+.mc-menu-heading {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 1.35rem;
+  font-weight: 400;
+  text-shadow: 2px 2px 0 #1e1e1e;
+  letter-spacing: 0.03em;
+}
+
+.mc-menu-brand {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.65rem, 4.5vw, 2.35rem);
+  font-weight: 700;
+  text-shadow: 3px 3px 0 #2a2a2a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.mc-menu-tagline {
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 38ch;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.mc-menu-column {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mc-menu-row {
+  display: flex;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.mc-menu-hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.mc-menu-hint--warn {
+  color: #ffe08a;
+}
+
+.mc-stone-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.65rem;
+  padding: 0.45rem 0.85rem;
+  background: linear-gradient(180deg, #9a9c9e 0%, #727476 38%, #5e6062 100%);
+  border: 2px solid #1a1b1d;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.28),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.42);
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #404040;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  appearance: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.mc-stone-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #a8b6d4 0%, #7d8bad 40%, #6a7a9a 100%);
+  color: #ffffb0;
+  text-shadow: 2px 2px 0 #4a5568;
+  border-color: #2a3142;
+}
+
+.mc-stone-button:active:not(:disabled) {
+  box-shadow:
+    inset -2px -2px 0 rgba(255, 255, 255, 0.12),
+    inset 2px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.mc-stone-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
+.mc-stone-button--wide {
+  width: 100%;
+}
+
+.mc-stone-button--half {
+  flex: 1;
+  min-width: 0;
+}
+
+.crosshair--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.collected-inventory--pause-front {
+  z-index: 7;
+  filter: brightness(0.92);
 }

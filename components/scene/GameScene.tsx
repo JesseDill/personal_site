@@ -48,6 +48,7 @@ export default function GameScene() {
   const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
   const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<DroppedBlockItem["material"] | null>(null);
+  const [hasEnteredWorldThisSession, setHasEnteredWorldThisSession] = useState(false);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
     dirt: 0,
@@ -346,7 +347,10 @@ export default function GameScene() {
         <InteractionRaycast onTarget={onTarget} />
         <PointerLockControls
           selector="#enter-world"
-          onLock={() => setLocked(true)}
+          onLock={() => {
+            setLocked(true);
+            setHasEnteredWorldThisSession(true);
+          }}
           onUnlock={() => {
             setLocked(false);
             setArmSwingHeld(false);
@@ -361,6 +365,8 @@ export default function GameScene() {
 
       <GameWorldHud
         locked={locked}
+        isPaused={!locked && hasEnteredWorldThisSession}
+        onQuitToTitle={() => setHasEnteredWorldThisSession(false)}
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
         hotbarSlots={hotbarSlots}
