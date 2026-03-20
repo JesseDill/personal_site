@@ -52,8 +52,16 @@ export function isTerrainBlockKeyOccupied(snapshot: TerrainOccupancySnapshot, bl
   );
 }
 
-/** Legacy support / collision: skip segments whose block key is in the removed set. */
+/**
+ * Whether a solid column segment should be ignored for player support / collision.
+ * Mined world voxels stay in `removedKeys`; their segments must be skipped.
+ * If the player replaces that voxel (same `blockKey`), the placed block must not be skipped — it would
+ * still match `removedKeys`, so we treat any key present in `placedBlocksByKey` as authoritative.
+ */
 export function isSolidSegmentIgnoredForSupport(snapshot: TerrainOccupancySnapshot, segment: SolidSegment) {
+  if (snapshot.placedBlocksByKey.has(segment.blockKey)) {
+    return false;
+  }
   return snapshot.removedKeys.has(segment.blockKey);
 }
 
