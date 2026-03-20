@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
-import { collectedInventoryMaterials, hotbarSlotCount } from "./game/config/inventory";
+import { hotbarSlotCount } from "./game/config/inventory";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
 import {
   githubProfileUrl,
@@ -53,6 +53,10 @@ export default function GameScene() {
     dirt: 0,
     wood: 0,
   });
+  /** Stable slot assignment: first pickup fills slot 0, next new type fills next empty slot (order does not reshuffle). */
+  const [hotbarSlots, setHotbarSlots] = useState<(DroppedBlockItem["material"] | null)[]>(() =>
+    Array.from({ length: hotbarSlotCount }, () => null),
+  );
 
   const {
     removedTerrainBlockKeys,
@@ -126,6 +130,14 @@ export default function GameScene() {
       ...current,
       [item.material]: current[item.material] + 1,
     }));
+    setHotbarSlots((slots) => {
+      if (slots.some((s) => s === item.material)) return slots;
+      const emptyIndex = slots.findIndex((s) => s === null);
+      if (emptyIndex === -1) return slots;
+      const next = [...slots];
+      next[emptyIndex] = item.material;
+      return next;
+    });
   }, []);
 
   const placeTerrainBlock = useCallback(
@@ -135,9 +147,19 @@ export default function GameScene() {
 
       setCollectedInventory((current) => {
         if (current[material] <= 0) return current;
+        const nextCount = current[material] - 1;
+        if (nextCount === 0) {
+          setHotbarSlots((slots) => {
+            const idx = slots.findIndex((s) => s === material);
+            if (idx === -1) return slots;
+            const nextSlots = [...slots];
+            nextSlots[idx] = null;
+            return nextSlots;
+          });
+        }
         return {
           ...current,
-          [material]: current[material] - 1,
+          [material]: nextCount,
         };
       });
 
@@ -219,11 +241,7 @@ export default function GameScene() {
     setHoveredInventoryMaterial(null);
   }, [activePanel, locked]);
 
-  const visibleInventoryMaterials = useMemo(
-    () => collectedInventoryMaterials.filter((material) => collectedInventory[material] > 0),
-    [collectedInventory],
-  );
-  const selectedInventoryMaterial = visibleInventoryMaterials[selectedInventorySlot] ?? null;
+  const selectedInventoryMaterial = hotbarSlots[selectedInventorySlot] ?? null;
   const heldInventoryMaterial = hoveredInventoryMaterial ?? selectedInventoryMaterial;
   const visibleTerrainBlocks = useMemo(
     () => composeVisibleTerrainBlocks(worldBlocks, removedTerrainBlockKeys, placedTerrainBlocks),
@@ -345,7 +363,7 @@ export default function GameScene() {
         locked={locked}
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
-        visibleInventoryMaterials={visibleInventoryMaterials}
+        hotbarSlots={hotbarSlots}
         selectedInventorySlot={selectedInventorySlot}
         collectedInventory={collectedInventory}
         onSelectSlot={(index, material) => {

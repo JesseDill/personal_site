@@ -8,7 +8,7 @@ type GameWorldHudProps = {
   locked: boolean;
   activePanel: boolean;
   targetLabel: string | null;
-  visibleInventoryMaterials: DroppedBlockItem["material"][];
+  hotbarSlots: (DroppedBlockItem["material"] | null)[];
   selectedInventorySlot: number;
   collectedInventory: Record<DroppedBlockItem["material"], number>;
   onSelectSlot: (index: number, material: DroppedBlockItem["material"] | null) => void;
@@ -20,7 +20,7 @@ export function GameWorldHud({
   locked,
   activePanel,
   targetLabel,
-  visibleInventoryMaterials,
+  hotbarSlots,
   selectedInventorySlot,
   collectedInventory,
   onSelectSlot,
@@ -61,7 +61,7 @@ export function GameWorldHud({
         <p className="collected-inventory-title">Collected</p>
         <div className="collected-inventory-grid">
           {Array.from({ length: hotbarSlotCount }, (_, index) => {
-            const material = visibleInventoryMaterials[index] ?? null;
+            const material = hotbarSlots[index] ?? null;
 
             return (
               <div
