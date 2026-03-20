@@ -29,6 +29,7 @@ export function PlayerController({
   const groundedRef = useRef(true);
   const jumpVelocity = 7.1;
   const gravity = 22;
+  const wasEnabledRef = useRef(enabled);
 
   useEffect(() => {
     camera.position.set(...playerSpawnPosition);
@@ -59,15 +60,21 @@ export function PlayerController({
   }, []);
 
   useEffect(() => {
-    if (enabled || !movingRef.current) return;
+    const wasEnabled = wasEnabledRef.current;
+    wasEnabledRef.current = enabled;
+
+    if (!wasEnabled || enabled) return;
+
     movingRef.current = false;
     onMovingChange(false);
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
-    camera.position.set(...playerSpawnPosition);
-    camera.rotation.set(...playerSpawnRotation);
-  }, [camera, enabled, onMovingChange]);
+    keysRef.current.KeyW = false;
+    keysRef.current.KeyS = false;
+    keysRef.current.KeyA = false;
+    keysRef.current.KeyD = false;
+  }, [enabled, onMovingChange]);
 
   useFrame((_state, delta) => {
     if (!enabled) return;
