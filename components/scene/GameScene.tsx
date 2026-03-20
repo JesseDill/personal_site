@@ -1,7 +1,7 @@
 "use client";
 
 import { Hud, PerspectiveCamera, PointerLockControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
@@ -34,6 +34,34 @@ import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { GameWorldHud } from "./game/ui/GameWorldHud";
 import { InteractionPanel } from "./game/ui/InteractionPanel";
+
+/**
+ * Binds pointer lock to the WebGL canvas (`domElement` must match `document.pointerLockElement` or three-stdlib
+ * never dispatches `lock` / `onLock`).
+ *
+ * We intentionally use a selector that matches no nodes: Drei registers click listeners in an effect inside
+ * the Canvas subtree, which can run before the sibling HUD mounts — then `querySelectorAll("#enter-world")` is
+ * empty and no listener is ever attached. UI buttons call `canvas.requestPointerLock()` directly instead.
+ */
+const POINTER_LOCK_CONTROLS_SELECTOR = "#__pointer_lock_no_auto_click__";
+
+function ScenePointerLockControls({
+  onLock,
+  onUnlock,
+}: {
+  onLock: () => void;
+  onUnlock: () => void;
+}) {
+  const gl = useThree((s) => s.gl);
+  return (
+    <PointerLockControls
+      domElement={gl.domElement}
+      selector={POINTER_LOCK_CONTROLS_SELECTOR}
+      onLock={onLock}
+      onUnlock={onUnlock}
+    />
+  );
+}
 
 export default function GameScene() {
   const [target, setTarget] = useState<InteractionId | null>(null);
@@ -69,8 +97,27 @@ export default function GameScene() {
   } = useTerrainOccupancy();
 
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
+  const worldCanvasElRef = useRef<HTMLCanvasElement | null>(null);
+
+  const requestWorldPointerLock = useCallback(() => {
+    worldCanvasElRef.current?.requestPointerLock();
+  }, []);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
+  const handlePointerLockGained = useCallback(() => {
+    setLocked(true);
+    setHasEnteredWorldThisSession(true);
+  }, []);
+
+  const handlePointerLockLost = useCallback(() => {
+    setLocked(false);
+    setArmSwingHeld(false);
+    setPlayerMoving(false);
+    setTarget(null);
+    setTargetLabel(null);
+    setTargetHref(null);
+    setHoveredInventoryMaterial(null);
+  }, []);
 
   const onTarget = useCallback((id: InteractionId | null, label: string | null, href: string | null) => {
     setTarget(id);
@@ -253,7 +300,14 @@ export default function GameScene() {
 
   return (
     <div className="scene-shell">
-      <Canvas camera={{ fov: 70 }} shadows style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+      <Canvas
+        camera={{ fov: 70 }}
+        shadows
+        style={{ position: "absolute", inset: 0, zIndex: 0 }}
+        onCreated={({ gl }) => {
+          worldCanvasElRef.current = gl.domElement as HTMLCanvasElement;
+        }}
+      >
         <ambientLight ref={ambientLightRef} intensity={worldSky.lighting.dayAmbient} />
         <hemisphereLight
           ref={hemisphereLightRef}
@@ -345,28 +399,14 @@ export default function GameScene() {
 
         <PlayerController enabled={locked} onMovingChange={setPlayerMoving} getOccupancySnapshot={getOccupancySnapshot} />
         <InteractionRaycast onTarget={onTarget} />
-        <PointerLockControls
-          selector="#enter-world"
-          onLock={() => {
-            setLocked(true);
-            setHasEnteredWorldThisSession(true);
-          }}
-          onUnlock={() => {
-            setLocked(false);
-            setArmSwingHeld(false);
-            setPlayerMoving(false);
-            setTarget(null);
-            setTargetLabel(null);
-            setTargetHref(null);
-            setHoveredInventoryMaterial(null);
-          }}
-        />
+        <ScenePointerLockControls onLock={handlePointerLockGained} onUnlock={handlePointerLockLost} />
       </Canvas>
 
       <GameWorldHud
         locked={locked}
         isPaused={!locked && hasEnteredWorldThisSession}
         onQuitToTitle={() => setHasEnteredWorldThisSession(false)}
+        onRequestPointerLock={requestWorldPointerLock}
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
         hotbarSlots={hotbarSlots}

@@ -10,6 +10,8 @@ type GameWorldHudProps = {
   /** True after the player has entered the world at least once this session and is now unlocked (Esc). */
   isPaused: boolean;
   onQuitToTitle: () => void;
+  /** Same user gesture as Enter / Back — must call `canvas.requestPointerLock()` (Drei’s selector wiring can miss the HUD). */
+  onRequestPointerLock: () => void;
   activePanel: boolean;
   targetLabel: string | null;
   hotbarSlots: (DroppedBlockItem["material"] | null)[];
@@ -24,6 +26,7 @@ export function GameWorldHud({
   locked,
   isPaused,
   onQuitToTitle,
+  onRequestPointerLock,
   activePanel,
   targetLabel,
   hotbarSlots,
@@ -35,8 +38,16 @@ export function GameWorldHud({
 }: GameWorldHudProps) {
   return (
     <div className="hud">
-      {!locked && !isPaused ? <MinecraftTitleScreen activePanel={activePanel} /> : null}
-      {!locked && isPaused ? <MinecraftPauseMenu activePanel={activePanel} onQuitToTitle={onQuitToTitle} /> : null}
+      {!locked && !isPaused ? (
+        <MinecraftTitleScreen activePanel={activePanel} onRequestPointerLock={onRequestPointerLock} />
+      ) : null}
+      {!locked && isPaused ? (
+        <MinecraftPauseMenu
+          activePanel={activePanel}
+          onQuitToTitle={onQuitToTitle}
+          onRequestPointerLock={onRequestPointerLock}
+        />
+      ) : null}
 
       <div className={`crosshair${!locked ? " crosshair--hidden" : ""}`} aria-hidden="true" />
 

@@ -2,10 +2,11 @@
 
 type MinecraftTitleScreenProps = {
   activePanel: boolean;
+  onRequestPointerLock: () => void;
 };
 
 /** First visit / after “Quit to title” — centered stone-style panel with Enter World. */
-export function MinecraftTitleScreen({ activePanel }: MinecraftTitleScreenProps) {
+export function MinecraftTitleScreen({ activePanel, onRequestPointerLock }: MinecraftTitleScreenProps) {
   return (
     <div className="mc-menu-root mc-menu-root--title" data-ui-layer="true" aria-label="Portfolio title">
       <h1 className="mc-menu-brand">Portfolio Craft</h1>
@@ -19,6 +20,9 @@ export function MinecraftTitleScreen({ activePanel }: MinecraftTitleScreenProps)
           className="mc-stone-button mc-stone-button--wide"
           disabled={activePanel}
           aria-describedby="mc-title-hint"
+          onClick={() => {
+            if (!activePanel) onRequestPointerLock();
+          }}
         >
           {activePanel ? "Close panel to enter" : "Enter World"}
         </button>
@@ -43,10 +47,11 @@ export function MinecraftTitleScreen({ activePanel }: MinecraftTitleScreenProps)
 type MinecraftPauseMenuProps = {
   activePanel: boolean;
   onQuitToTitle: () => void;
+  onRequestPointerLock: () => void;
 };
 
 /** Esc pause — dimmed world, centered game menu (Minecraft-style). */
-export function MinecraftPauseMenu({ activePanel, onQuitToTitle }: MinecraftPauseMenuProps) {
+export function MinecraftPauseMenu({ activePanel, onQuitToTitle, onRequestPointerLock }: MinecraftPauseMenuProps) {
   return (
     <>
       <div className="mc-pause-dim" aria-hidden="true" />
@@ -58,6 +63,9 @@ export function MinecraftPauseMenu({ activePanel, onQuitToTitle }: MinecraftPaus
             type="button"
             className="mc-stone-button mc-stone-button--wide"
             disabled={activePanel}
+            onClick={() => {
+              if (!activePanel) onRequestPointerLock();
+            }}
           >
             Back to Game
           </button>
