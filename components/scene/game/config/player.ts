@@ -9,8 +9,8 @@ export const playerCollisionConfig = {
   groundSnapDistance: 0.18,
 } as const;
 
-export const playerSpawnPosition: [number, number, number] = [0, playerCollisionConfig.eyeHeight + 1, 2.5];
-export const playerSpawnRotation: [number, number, number] = [0, Math.PI, 0];
+export const playerSpawnPosition: [number, number, number] = [0, playerCollisionConfig.eyeHeight + 2, 2.5];
+export const playerSpawnRotation: [number, number, number] = [-Math.PI/64, Math.PI, 0];
 
 /** Cells where landmark pads sit — player cannot stand here. */
 export const blockedLandmarkCells = new Set(

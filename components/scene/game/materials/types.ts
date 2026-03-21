@@ -12,6 +12,8 @@ export type MaterialDefinition = {
     back?: string;
   };
   uiColor: string;
+  /** When set, multiplies a neutral white face texture to a flat tint (good for calm “paper” boards). */
+  solidColor?: string;
   roughness?: number;
   metalness?: number;
   emissive?: string;

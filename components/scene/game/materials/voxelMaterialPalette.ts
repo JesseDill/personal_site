@@ -42,6 +42,14 @@ export const voxelMaterialPalette = {
   dirt: { textures: { all: "/textures/world/dirt.svg" }, uiColor: "#8b6541", roughness: 1 },
   bedrock: { textures: { all: "/textures/world/bedrock.svg" }, uiColor: "#52565c", roughness: 1 },
   signStone: { textures: { all: "/textures/world/sign-stone.svg" }, uiColor: "#8b8f98", roughness: 0.92 },
+  /** Spawn billboard backing: flat, bright, low-chroma surface for text/images without busy stone grain. */
+  spawnBoard: {
+    textures: { all: "/textures/world/solid-white.svg" },
+    solidColor: "#f2f8ff",
+    uiColor: "#dce8f5",
+    roughness: 0.88,
+    metalness: 0,
+  },
   path: { textures: { all: "/textures/world/path.svg" }, uiColor: "#b89b6f", roughness: 0.96 },
   stone: { textures: { all: "/textures/world/stone.svg" }, uiColor: "#9f9380", roughness: 1 },
   stoneDark: { textures: { all: "/textures/world/stone-dark.svg" }, uiColor: "#5f5a54", roughness: 1 },

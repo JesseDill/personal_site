@@ -21,19 +21,33 @@ export function InteractionRaycast({
   useFrame(() => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     const hits = raycaster.intersectObjects(scene.children, true);
-    const hit = hits.find(
-      (entry) =>
-        (entry.object.userData?.interactionId as InteractionId | undefined) ||
-        (entry.object.userData?.externalHref as string | undefined),
-    );
 
-    const nextTarget = hit
-      ? {
-          id: (hit.object.userData.interactionId as InteractionId | undefined) ?? null,
-          label: hit.object.userData.label as string,
-          href: (hit.object.userData.externalHref as string | undefined) ?? null,
+    let nextTarget: { id: InteractionId | null; label: string | null; href: string | null } = {
+      id: null,
+      label: null,
+      href: null,
+    };
+
+    for (const entry of hits) {
+      const o = entry.object;
+      const resolveIntro = o.userData?.resolveIntroLink as ((h: THREE.Intersection) => { href: string; label: string } | null) | undefined;
+      if (typeof resolveIntro === "function") {
+        const link = resolveIntro(entry);
+        if (link) {
+          nextTarget = { id: null, label: link.label, href: link.href };
+          break;
         }
-      : { id: null, label: null, href: null };
+        continue;
+      }
+      if (o.userData?.interactionId || o.userData?.externalHref) {
+        nextTarget = {
+          id: (o.userData.interactionId as InteractionId | undefined) ?? null,
+          label: o.userData.label as string,
+          href: (o.userData.externalHref as string | undefined) ?? null,
+        };
+        break;
+      }
+    }
 
     if (
       lastTargetRef.current.id === nextTarget.id &&
@@ -44,11 +58,6 @@ export function InteractionRaycast({
     }
 
     lastTargetRef.current = nextTarget;
-
-    if (!hit) {
-      onTarget(null, null, null);
-      return;
-    }
 
     onTarget(nextTarget.id, nextTarget.label, nextTarget.href);
   });

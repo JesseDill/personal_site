@@ -3,6 +3,11 @@
 import { Text, useTexture } from "@react-three/drei";
 import { useEffect } from "react";
 import * as THREE from "three";
+import {
+  INTRO_BILLBOARD_TEXT,
+  INTRO_TEXT_COLOR_RANGES,
+  resolveIntroTextLinkAtHit,
+} from "../config/introBillboardCopy";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
 
 export function BillboardSocialSign({
@@ -54,10 +59,21 @@ export function BillboardSocialSign({
   );
 }
 
-export function BillboardPhotoSign({ texturePath, position }: { texturePath: string; position: [number, number, number] }) {
+export function BillboardPhotoSign({
+  texturePath,
+  position,
+  width = 0.8,
+  height = 0.8,
+}: {
+  texturePath: string;
+  position: [number, number, number];
+  /** World units; frame + plane match this aspect. */
+  width?: number;
+  height?: number;
+}) {
   const texture = useTexture(texturePath);
-  const signWidth = 0.8;
-  const signHeight = 0.8;
+  const signWidth = width;
+  const signHeight = height;
 
   useEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -86,21 +102,47 @@ export function BillboardPhotoSign({ texturePath, position }: { texturePath: str
   );
 }
 
-export function BillboardIntroText({ position }: { position: [number, number, number] }) {
+export function BillboardIntroText({
+  position,
+  fontSize = 0.17,
+  maxWidth = 3.55,
+  lineHeight = 1.24,
+  outlineWidth = 0.012,
+  font,
+  color = "#f8fafc",
+  outlineColor = "#1f2937",
+}: {
+  position: [number, number, number];
+  fontSize?: number;
+  maxWidth?: number;
+  lineHeight?: number;
+  outlineWidth?: number;
+  /** URL from site root to a `.ttf` / `.otf` / `.woff` under `public/`. */
+  font?: string;
+  color?: string;
+  outlineColor?: string;
+}) {
   return (
     <Text
       position={position}
       rotation={[0, Math.PI, 0]}
-      maxWidth={1.55}
-      fontSize={0.14}
-      lineHeight={1.24}
+      font={font}
+      maxWidth={maxWidth}
+      fontSize={fontSize}
+      lineHeight={lineHeight}
       anchorX="left"
       anchorY="middle"
-      color="#f8fafc"
-      outlineColor="#1f2937"
-      outlineWidth={0.012}
+      color={color}
+      outlineColor={outlineColor}
+      outlineWidth={outlineWidth}
+      // Troika `Text` supports `colorRanges`; @react-three/drei’s props omit it but R3F forwards it.
+      {...{ colorRanges: INTRO_TEXT_COLOR_RANGES }}
+      onSync={(troika) => {
+        troika.userData.resolveIntroLink = (hit: THREE.Intersection) =>
+          resolveIntroTextLinkAtHit(troika as THREE.Mesh & { textRenderInfo?: { caretPositions: Float32Array } }, hit.point);
+      }}
     >
-      {"Hi there!"}
+      {INTRO_BILLBOARD_TEXT}
     </Text>
   );
 }

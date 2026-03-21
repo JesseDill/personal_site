@@ -14,6 +14,7 @@ export const blockBreakHitsRequired = {
   dirt: 4,
   bedrock: Number.MAX_SAFE_INTEGER,
   signStone: 10,
+  spawnBoard: 10,
   path: 5,
   stone: 8,
   stoneDark: 9,
@@ -30,4 +31,6 @@ export const unbreakableTerrainMaterials = new Set<Exclude<WorldMaterial, "cloud
   "bedrock",
   "stoneDark",
   "signStone",
+  "spawnBoard",
 ]);
+

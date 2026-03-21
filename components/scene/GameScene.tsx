@@ -8,6 +8,7 @@ import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
 import { hotbarSlotCount } from "./game/config/inventory";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
+import { getSocialSignPositions, spawnBillboardLayout } from "./game/config/spawnBillboardLayout";
 import {
   githubProfileUrl,
   googleScholarProfileUrl,
@@ -34,6 +35,8 @@ import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { GameWorldHud } from "./game/ui/GameWorldHud";
 import { InteractionPanel } from "./game/ui/InteractionPanel";
+
+const spawnSocialPositions = getSocialSignPositions();
 
 /**
  * Binds pointer lock to the WebGL canvas (`domElement` must match `document.pointerLockElement` or three-stdlib
@@ -150,7 +153,7 @@ export default function GameScene() {
         ? "wood"
         : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt"
           ? "dirt"
-          : null;
+        : null;
 
     if (droppedMaterial) {
       setDroppedItems((current) => [
@@ -193,8 +196,8 @@ export default function GameScene() {
       const blockKey = getTerrainBlockKey(blockPosition);
       const worldMaterial = material === "wood" ? "wood" : "dirt";
 
-      setCollectedInventory((current) => {
-        if (current[material] <= 0) return current;
+    setCollectedInventory((current) => {
+      if (current[material] <= 0) return current;
         const nextCount = current[material] - 1;
         if (nextCount === 0) {
           setHotbarSlots((slots) => {
@@ -205,16 +208,16 @@ export default function GameScene() {
             return nextSlots;
           });
         }
-        return {
-          ...current,
+      return {
+        ...current,
           [material]: nextCount,
-        };
-      });
+      };
+    });
 
-      setPlacedTerrainBlocks((current) => {
+    setPlacedTerrainBlocks((current) => {
         if (current.some((entry) => getTerrainBlockKey(entry.position) === blockKey)) return current;
-        return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
-      });
+      return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
+    });
     },
     [setPlacedTerrainBlocks],
   );
@@ -356,27 +359,32 @@ export default function GameScene() {
           onPlaceSwing={triggerPlacementSwing}
           getOccupancySnapshot={getOccupancySnapshot}
         />
-        <BillboardPhotoSign texturePath="/textures/world/wave_hand.png" position={[0.52, 3.55, 6.49]} />
-        <BillboardIntroText position={[-0.05, 3.55, 6.49]} />
+        <BillboardPhotoSign
+          texturePath={spawnBillboardLayout.photo.texturePath}
+          position={spawnBillboardLayout.photo.position}
+          width={spawnBillboardLayout.photo.width}
+          height={spawnBillboardLayout.photo.height}
+        />
+        <BillboardIntroText {...spawnBillboardLayout.introText} />
         <BillboardSocialSign
           label="LinkedIn"
           href={linkedinProfileUrl}
           texturePath="/textures/world/linkedin-logo.svg"
-          position={[0, 2.8, 6.49]}
+          position={spawnSocialPositions.linkedin}
           isActive={targetHref === linkedinProfileUrl}
         />
         <BillboardSocialSign
           label="Google Scholar"
           href={googleScholarProfileUrl}
           texturePath="/textures/world/google-scholar-logo.svg"
-          position={[0.7, 2.8, 6.49]}
+          position={spawnSocialPositions.googleScholar}
           isActive={targetHref === googleScholarProfileUrl}
         />
         <BillboardSocialSign
           label="GitHub"
           href={githubProfileUrl}
           texturePath="/textures/world/github-logo.svg"
-          position={[-0.7, 2.8, 6.49]}
+          position={spawnSocialPositions.github}
           isActive={targetHref === githubProfileUrl}
         />
         {landmarks.map((landmark) => (
@@ -413,13 +421,13 @@ export default function GameScene() {
         selectedInventorySlot={selectedInventorySlot}
         collectedInventory={collectedInventory}
         onSelectSlot={(index, material) => {
-          setSelectedInventorySlot(index);
-          if (material) setHoveredInventoryMaterial(material);
-        }}
+                  setSelectedInventorySlot(index);
+                  if (material) setHoveredInventoryMaterial(material);
+                }}
         onHoverMaterial={(material) => setHoveredInventoryMaterial(material)}
         onSlotMouseLeave={(material) => {
-          setHoveredInventoryMaterial((current) => (current === material ? null : current));
-        }}
+                  setHoveredInventoryMaterial((current) => (current === material ? null : current));
+                }}
       />
 
       {content ? <InteractionPanel content={content} onClose={() => setActivePanel(null)} /> : null}

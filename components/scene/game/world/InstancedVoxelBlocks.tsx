@@ -58,7 +58,7 @@ export function InstancedVoxelBlocks({
           key={`${index}-${texture.uuid}`}
           attach={`material-${index}`}
           map={texture}
-          color="#ffffff"
+          color={material.solidColor ?? "#ffffff"}
           roughness={material.roughness ?? 1}
           metalness={material.metalness ?? 0}
           emissive={material.emissive}
