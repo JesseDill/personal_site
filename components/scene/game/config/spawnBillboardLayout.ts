@@ -1,5 +1,5 @@
 /**
- * Single place to tune spawn-wall billboards (photo, intro copy, social row).
+ * Single place to tune spawn-wall billboards (photo, intro copy, publications, social row).
  * Social Y is derived from the photo anchor so the row sits just under the portrait.
  *
  * `photo.width` / `photo.height` are passed to `BillboardPhotoSign` (world units on the wall plane).
@@ -22,6 +22,30 @@ export type IntroTextLayout = {
   font?: string;
 };
 
+/** NVF publication row: GIF left, troika text right (below intro + social row). */
+export type PublicationsBillboardLayout = {
+  position: [number, number, number];
+  gif: {
+    path: string;
+    width: number;
+    height: number;
+    position: [number, number, number];
+  };
+  heading: {
+    position: [number, number, number];
+    fontSize: number;
+    maxWidth: number;
+    outlineWidth: number;
+  };
+  body: {
+    position: [number, number, number];
+    fontSize: number;
+    maxWidth: number;
+    lineHeight: number;
+    outlineWidth: number;
+  };
+};
+
 export const spawnBillboardLayout: {
   photo: {
     position: [number, number, number];
@@ -30,6 +54,7 @@ export const spawnBillboardLayout: {
     height: number;
   };
   introText: IntroTextLayout;
+  publications: PublicationsBillboardLayout;
   socialSpacing: number;
   gapBelowPhoto: number;
 } = {
@@ -46,9 +71,30 @@ export const spawnBillboardLayout: {
     maxWidth: 4.55,
     lineHeight: 1.24,
     outlineWidth: 0.012,
-    font: "/fonts/IBMPlexMono-Light.ttf", 
-    // font: "/fonts/IBMPlexMono-Bold.ttf", 
-
+    font: "/fonts/IBMPlexMono-Light.ttf",
+    // font: "/fonts/IBMPlexMono-Bold.ttf",
+  },
+  publications: {
+    position: [0.55, 3.38, 6.49],
+    gif: {
+      path: "/textures/world/uncertainty.gif",
+      width: 2.02,
+      height: 2.02,
+      position: [-1.08, -0.4, 0.03],
+    },
+    heading: {
+      position: [0.2, 0.46, 0.04],
+      fontSize: 0.19,
+      maxWidth: 4.35,
+      outlineWidth: 0.012,
+    },
+    body: {
+      position: [0.2, 0.18, 0.04],
+      fontSize: 0.105,
+      maxWidth: 4.15,
+      lineHeight: 1.24,
+      outlineWidth: 0.01,
+    },
   },
   /** World X gap between adjacent social sign centers (row is centered on photo X). */
   socialSpacing: 0.52,

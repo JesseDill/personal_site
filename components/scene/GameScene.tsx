@@ -20,6 +20,7 @@ import {
   BillboardPhotoSign,
   BillboardSocialSign,
 } from "./game/entities/Billboards";
+import { BillboardPublicationRow } from "./game/entities/BillboardPublicationRow";
 import { DroppedBlockItems } from "./game/entities/DroppedBlockItems";
 import { InteractableLandmark } from "./game/entities/InteractableLandmark";
 import { TerrainBreakOverlay } from "./game/entities/TerrainBreakOverlay";
@@ -387,6 +388,7 @@ export default function GameScene() {
           position={spawnSocialPositions.github}
           isActive={targetHref === githubProfileUrl}
         />
+        <BillboardPublicationRow />
         {landmarks.map((landmark) => (
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}

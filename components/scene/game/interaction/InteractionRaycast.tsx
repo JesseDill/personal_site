@@ -39,6 +39,17 @@ export function InteractionRaycast({
         }
         continue;
       }
+      const resolvePublication = o.userData?.resolvePublicationLink as ((
+        h: THREE.Intersection,
+      ) => { href: string; label: string } | null) | undefined;
+      if (typeof resolvePublication === "function") {
+        const link = resolvePublication(entry);
+        if (link) {
+          nextTarget = { id: null, label: link.label, href: link.href };
+          break;
+        }
+        continue;
+      }
       if (o.userData?.interactionId || o.userData?.externalHref) {
         nextTarget = {
           id: (o.userData.interactionId as InteractionId | undefined) ?? null,
