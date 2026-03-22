@@ -19,6 +19,19 @@
   --hotbar-count-right: 0.18rem;
   --hotbar-count-bottom: 0.14rem;
   --hotbar-selected-lift: -4px;
+
+  /*
+   * Interaction hover tooltip (`.tooltip` in `GameWorldHud` — label from `InteractionRaycast`).
+   * Sizing: `--interaction-tooltip-font-size`, `--interaction-tooltip-padding`, `--interaction-tooltip-max-width`.
+   * Long URLs: raise max-width or set `text-transform: none` / smaller `letter-spacing` on `.tooltip` below.
+   */
+  --interaction-tooltip-bg: rgba(0, 136, 233, 0.92);
+  --interaction-tooltip-border: #0d00ff;
+  --interaction-tooltip-text: #fff7d1;
+  --interaction-tooltip-shadow: 0 8px 0 rgba(45, 36, 23, 0.22);
+  --interaction-tooltip-font-size: 0.6rem;
+  --interaction-tooltip-padding: 0.15rem 0.3rem;
+  --interaction-tooltip-max-width: min(42ch, calc(100vw - 2rem));
 }
 
 * {
@@ -207,12 +220,16 @@ a {
   left: 50%;
   top: calc(50% + 22px);
   transform: translateX(-50%);
-  background: rgba(35, 50, 23, 0.92);
-  border: 3px solid #f0d476;
-  box-shadow: 0 8px 0 rgba(45, 36, 23, 0.22);
-  color: #fff7d1;
-  padding: 0.45rem 0.8rem;
-  font-size: 0.82rem;
+  max-width: var(--interaction-tooltip-max-width);
+  box-sizing: border-box;
+  background: var(--interaction-tooltip-bg);
+  border: 3px solid var(--interaction-tooltip-border);
+  box-shadow: var(--interaction-tooltip-shadow);
+  color: var(--interaction-tooltip-text);
+  padding: var(--interaction-tooltip-padding);
+  font-size: var(--interaction-tooltip-font-size);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

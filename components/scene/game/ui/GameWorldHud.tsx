@@ -60,6 +60,7 @@ export function GameWorldHud({
 
       <div className={`crosshair${!locked ? " crosshair--hidden" : ""}`} style={crosshairStyle} aria-hidden="true" />
 
+      {/* Hover label from `InteractionRaycast` → colors: `app/globals.css` :root `--interaction-tooltip-*` */}
       {targetLabel && locked ? (
         <div className="tooltip" style={tooltipStyle}>
           {targetLabel}

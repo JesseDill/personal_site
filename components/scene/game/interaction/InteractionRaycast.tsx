@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { InteractionId } from "@/data/interactions";
+import { linkHoverLabelFromHref } from "./linkHoverLabel";
 
 export function InteractionRaycast({
   onTarget,
@@ -36,7 +37,11 @@ export function InteractionRaycast({
       if (typeof resolveIntro === "function") {
         const link = resolveIntro(entry);
         if (link) {
-          nextTarget = { id: null, label: link.label, href: link.href };
+          nextTarget = {
+            id: null,
+            label: linkHoverLabelFromHref(link.href, link.label),
+            href: link.href,
+          };
           break;
         }
         continue;
@@ -47,16 +52,22 @@ export function InteractionRaycast({
       if (typeof resolvePublication === "function") {
         const link = resolvePublication(entry);
         if (link) {
-          nextTarget = { id: null, label: link.label, href: link.href };
+          nextTarget = {
+            id: null,
+            label: linkHoverLabelFromHref(link.href, link.label),
+            href: link.href,
+          };
           break;
         }
         continue;
       }
       if (o.userData?.interactionId || o.userData?.externalHref) {
+        const href = (o.userData.externalHref as string | undefined) ?? null;
+        const signLabel = o.userData.label as string;
         nextTarget = {
           id: (o.userData.interactionId as InteractionId | undefined) ?? null,
-          label: o.userData.label as string,
-          href: (o.userData.externalHref as string | undefined) ?? null,
+          label: linkHoverLabelFromHref(href, signLabel),
+          href,
         };
         break;
       }
