@@ -533,6 +533,15 @@ a {
 
 /* --- Minecraft-style game menu (pause + title) --- */
 
+.mc-title-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(28, 28, 32, 0.58);
+  pointer-events: auto;
+  backdrop-filter: grayscale(0.55) brightness(0.68);
+}
+
 .mc-pause-dim {
   position: absolute;
   inset: 0;
@@ -557,6 +566,11 @@ a {
 
 .mc-menu-root--title {
   top: 46%;
+}
+
+.mc-menu-root--title .mc-menu-brand {
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .mc-menu-heading {
