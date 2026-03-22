@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { InteractionId } from "@/data/interactions";
+import { interactionHoverMaxDistance } from "../config/particles";
 import { linkHoverLabelFromHref } from "./linkHoverLabel";
 
 export function InteractionRaycast({
@@ -31,7 +32,10 @@ export function InteractionRaycast({
       href: null,
     };
 
+    const maxReach = interactionHoverMaxDistance;
     for (const entry of hits) {
+      if (entry.distance > maxReach) continue;
+
       const o = entry.object;
       const resolveIntro = o.userData?.resolveIntroLink as ((h: THREE.Intersection) => { href: string; label: string } | null) | undefined;
       if (typeof resolveIntro === "function") {

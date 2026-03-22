@@ -12,6 +12,9 @@ export const terrainImpactConfig = {
   angularVelocity: 8,
 } as const;
 
+/** Center-ray hover for links / landmarks; longer than break–place reach so billboards read from farther away. */
+export const interactionHoverMaxDistance = terrainImpactConfig.maxDistance * 1.5;
+
 export const terrainImpactMaterials = (Object.keys(voxelMaterialPalette) as WorldMaterial[]).filter(
   (material): material is Exclude<WorldMaterial, "cloud"> => material !== "cloud",
 );
