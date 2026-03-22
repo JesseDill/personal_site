@@ -14,6 +14,11 @@ export type IntroTextLayout = {
   maxWidth: number;
   lineHeight: number;
   outlineWidth: number;
+  /** Main paragraph fill (`#RRGGBB`). Hyperlink tint uses `linkColor`. */
+  color?: string;
+  outlineColor?: string;
+  /** Link text in intro copy (`introBillboardCopy`); not forwarded to `<Text>`. */
+  linkColor?: string;
   /**
    * Optional webfont URL from the site root (file must live under `public/`).
    * Use `.ttf`, `.otf`, or `.woff`. Example: `"/fonts/Inter-Medium.ttf"`.
@@ -25,11 +30,20 @@ export type IntroTextLayout = {
 /** NVF publication row: GIF left, troika text right (below intro + social row). */
 export type PublicationsBillboardLayout = {
   position: [number, number, number];
+  /** Optional webfont for heading + body; falls back to `introText.font`. */
+  font?: string;
   gif: {
     path: string;
     width: number;
     height: number;
     position: [number, number, number];
+  };
+  /** Optional troika text colors (`#RRGGBB`). Omitted fields keep previous defaults. */
+  text?: {
+    headingFill?: string;
+    bodyFill?: string;
+    outline?: string;
+    link?: string;
   };
   heading: {
     position: [number, number, number];
@@ -70,30 +84,41 @@ export const spawnBillboardLayout: {
     fontSize: 0.11,
     maxWidth: 4.55,
     lineHeight: 1.24,
-    outlineWidth: 0.012,
+    outlineWidth: 0.001,
+    color: "#000000",
+    outlineColor: "#000000",
+    linkColor: "#004182",
+    // font: "/fonts/IBMPlexMono-Light.ttf",
     font: "/fonts/IBMPlexMono-Light.ttf",
-    // font: "/fonts/IBMPlexMono-Bold.ttf",
   },
   publications: {
     position: [0.55, 3.38, 6.49],
+    font: "/fonts/IBMPlexMono-Light.ttf",
     gif: {
       path: "/textures/world/uncertainty.gif",
       width: 2.02,
       height: 2.02,
       position: [-1.48, -0.55, 0.03],
     },
+    text: {
+      headingFill: "#000000",
+      bodyFill: "#000000",
+      // outline: "#1f2937",
+      outline: "#000000",
+      link: "#004182",
+    },
     heading: {
       position: [-2.5, 0.4, 0.04],
       fontSize: 0.19,
       maxWidth: 4.35,
-      outlineWidth: 0.012,
+      outlineWidth: 0.001,//0.012,
     },
     body: {
       position: [-0.3, 0.04, 0.04],
-      fontSize: 0.105,
+      fontSize: 0.10,
       maxWidth: 4.15,
       lineHeight: 1.24,
-      outlineWidth: 0.01,
+      outlineWidth: 0.001,//0.01,
     },
   },
   /** World X gap between adjacent social sign centers (row is centered on photo X). */

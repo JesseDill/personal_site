@@ -111,6 +111,7 @@ export function BillboardIntroText({
   font,
   color = "#f8fafc",
   outlineColor = "#1f2937",
+  colorRanges: colorRangesProp,
 }: {
   position: [number, number, number];
   fontSize?: number;
@@ -121,6 +122,8 @@ export function BillboardIntroText({
   font?: string;
   color?: string;
   outlineColor?: string;
+  /** Overrides default `INTRO_TEXT_COLOR_RANGES` (e.g. from `spawnBillboardLayout`). */
+  colorRanges?: Record<number, number>;
 }) {
   return (
     <Text
@@ -136,7 +139,7 @@ export function BillboardIntroText({
       outlineColor={outlineColor}
       outlineWidth={outlineWidth}
       // Troika `Text` supports `colorRanges`; @react-three/drei’s props omit it but R3F forwards it.
-      {...{ colorRanges: INTRO_TEXT_COLOR_RANGES }}
+      {...{ colorRanges: colorRangesProp ?? INTRO_TEXT_COLOR_RANGES }}
       onSync={(troika) => {
         troika.userData.resolveIntroLink = (hit: THREE.Intersection) =>
           resolveIntroTextLinkAtHit(troika as THREE.Mesh & { textRenderInfo?: { caretPositions: Float32Array } }, hit.point);

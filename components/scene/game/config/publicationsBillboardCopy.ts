@@ -1,6 +1,7 @@
 import type { Mesh } from "three";
 import { Vector3 } from "three";
 import { getCaretAtPoint } from "troika-three-text";
+import { hexCssToTroikaInt } from "./introBillboardCopy";
 
 const PAPER_TITLE = "Neural Visibility Field for Uncertainty-Driven Active Mapping";
 
@@ -67,15 +68,17 @@ export const PUBLICATION_TEXT_LINKS: PublicationTextLink[] = [
   },
 ];
 
-const COLOR_BODY = 0xf8fafc;
-const COLOR_LINK = 0x0865c9;
-
-export function buildPublicationTextColorRanges(): Record<number, number> {
-  const ranges: Record<number, number> = { 0: COLOR_BODY };
+export function buildPublicationTextColorRanges(
+  bodyHex = "#f8fafc",
+  linkHex = "#0865c9",
+): Record<number, number> {
+  const body = hexCssToTroikaInt(bodyHex);
+  const link = hexCssToTroikaInt(linkHex);
+  const ranges: Record<number, number> = { 0: body };
   const sorted = [...PUBLICATION_TEXT_LINKS].sort((a, b) => a.start - b.start);
-  for (const link of sorted) {
-    ranges[link.start] = COLOR_LINK;
-    ranges[link.end] = COLOR_BODY;
+  for (const l of sorted) {
+    ranges[l.start] = link;
+    ranges[l.end] = body;
   }
   return ranges;
 }

@@ -8,6 +8,7 @@ import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
 import { hotbarSlotCount } from "./game/config/inventory";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
+import { buildIntroTextColorRanges } from "./game/config/introBillboardCopy";
 import { getSocialSignPositions, spawnBillboardLayout } from "./game/config/spawnBillboardLayout";
 import {
   githubProfileUrl,
@@ -369,6 +370,13 @@ export default function GameScene() {
     [placedTerrainBlocks, removedTerrainBlockKeys],
   );
 
+  const introLayout = spawnBillboardLayout.introText;
+  const { linkColor: introLinkColor, ...introTextMeshProps } = introLayout;
+  const introColorRanges = useMemo(
+    () => buildIntroTextColorRanges(introTextMeshProps.color ?? "#f8fafc", introLinkColor ?? "#0865c9"),
+    [introLinkColor, introTextMeshProps.color],
+  );
+
   const content = activePanel ? interactionContent[activePanel] : null;
 
   return (
@@ -435,7 +443,7 @@ export default function GameScene() {
           width={spawnBillboardLayout.photo.width}
           height={spawnBillboardLayout.photo.height}
         />
-        <BillboardIntroText {...spawnBillboardLayout.introText} />
+        <BillboardIntroText {...introTextMeshProps} colorRanges={introColorRanges} />
         <BillboardSocialSign
           label="LinkedIn"
           href={linkedinProfileUrl}

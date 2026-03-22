@@ -3,6 +3,7 @@
 import type { WorldBlock, WorldMaterial } from "@/data/world";
 import { useMemo } from "react";
 import * as THREE from "three";
+import type { MaterialDefinition } from "../materials/types";
 import { useVoxelTextures } from "../materials/useVoxelTextures";
 import { cubeFaceOrder } from "../materials/types";
 import { faceTexturePaths, voxelMaterialPalette } from "../materials/voxelMaterialPalette";
@@ -26,14 +27,20 @@ export function VoxelWorld({ blocks }: { blocks: WorldBlock[] }) {
   return (
     <>
       {(Object.keys(groupedBlocks) as WorldMaterial[]).map((material) => (
-        <InstancedVoxelBlocks
-          key={material}
-          materialId={material}
-          positions={groupedBlocks[material]}
-          material={voxelMaterialPalette[material]}
-          faceTextures={faceTexturesByMaterial[material]}
-          castShadow={material !== "cloud"}
-        />
+        (() => {
+          const definition: MaterialDefinition = voxelMaterialPalette[material];
+          return (
+            <InstancedVoxelBlocks
+              key={material}
+              materialId={material}
+              positions={groupedBlocks[material]}
+              material={definition}
+              faceTextures={faceTexturesByMaterial[material]}
+              castShadow={material !== "cloud" && !definition.unlit}
+              receiveShadow={!definition.unlit}
+            />
+          );
+        })()
       ))}
     </>
   );

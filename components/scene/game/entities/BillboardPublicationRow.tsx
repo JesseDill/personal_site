@@ -5,14 +5,19 @@ import * as THREE from "three";
 import { spawnBillboardLayout } from "../config/spawnBillboardLayout";
 import {
   PUBLICATION_BODY_TEXT,
-  PUBLICATION_TEXT_COLOR_RANGES,
+  buildPublicationTextColorRanges,
   resolvePublicationTextLinkAtHit,
 } from "../config/publicationsBillboardCopy";
 import { AnimatedGifPlane } from "./AnimatedGifPlane";
 
 export function BillboardPublicationRow() {
   const p = spawnBillboardLayout.publications;
-  const font = spawnBillboardLayout.introText.font;
+  const font = p.font ?? spawnBillboardLayout.introText.font;
+  const tc = p.text;
+  const publicationColorRanges = buildPublicationTextColorRanges(
+    tc?.bodyFill ?? "#f8fafc",
+    tc?.link ?? "#0865c9",
+  );
 
   return (
     <group position={p.position} rotation={[0, Math.PI, 0]}>
@@ -29,8 +34,8 @@ export function BillboardPublicationRow() {
         font={font}
         fontSize={p.heading.fontSize}
         fontWeight="bold"
-        color="#f8fafc"
-        outlineColor="#1f2937"
+        color={tc?.headingFill ?? "#f8fafc"}
+        outlineColor={tc?.outline ?? "#1f2937"}
         outlineWidth={p.heading.outlineWidth}
         maxWidth={p.heading.maxWidth}
       >
@@ -44,10 +49,10 @@ export function BillboardPublicationRow() {
         fontSize={p.body.fontSize}
         lineHeight={p.body.lineHeight}
         maxWidth={p.body.maxWidth}
-        color="#f8fafc"
-        outlineColor="#1f2937"
+        color={tc?.bodyFill ?? "#f8fafc"}
+        outlineColor={tc?.outline ?? "#1f2937"}
         outlineWidth={p.body.outlineWidth}
-        {...{ colorRanges: PUBLICATION_TEXT_COLOR_RANGES }}
+        {...{ colorRanges: publicationColorRanges }}
         onSync={(troika) => {
           troika.userData.resolvePublicationLink = (hit: THREE.Intersection) =>
             resolvePublicationTextLinkAtHit(

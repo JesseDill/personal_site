@@ -11,6 +11,7 @@ type InstancedVoxelBlocksProps = {
   material: MaterialDefinition;
   faceTextures: THREE.Texture[];
   castShadow?: boolean;
+  receiveShadow?: boolean;
 };
 
 export function InstancedVoxelBlocks({
@@ -19,6 +20,7 @@ export function InstancedVoxelBlocks({
   material,
   faceTextures,
   castShadow = true,
+  receiveShadow = true,
 }: InstancedVoxelBlocksProps) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -46,27 +48,39 @@ export function InstancedVoxelBlocks({
       ref={ref}
       args={[undefined, undefined, positions.length]}
       castShadow={castShadow}
-      receiveShadow
+      receiveShadow={receiveShadow}
       frustumCulled={false}
       userData={{
         terrainMaterial: materialId,
       }}
     >
       <boxGeometry args={[1, 1, 1]} />
-      {faceTextures.map((texture, index) => (
-        <meshStandardMaterial
-          key={`${index}-${texture.uuid}`}
-          attach={`material-${index}`}
-          map={texture}
-          color={material.solidColor ?? "#ffffff"}
-          roughness={material.roughness ?? 1}
-          metalness={material.metalness ?? 0}
-          emissive={material.emissive}
-          emissiveIntensity={material.emissiveIntensity}
-          transparent={material.transparent}
-          alphaTest={material.alphaTest ?? 0}
-        />
-      ))}
+      {faceTextures.map((texture, index) =>
+        material.unlit ? (
+          <meshBasicMaterial
+            key={`${index}-${texture.uuid}`}
+            attach={`material-${index}`}
+            map={texture}
+            color={material.solidColor ?? "#ffffff"}
+            transparent={material.transparent}
+            alphaTest={material.alphaTest ?? 0}
+            toneMapped={false}
+          />
+        ) : (
+          <meshStandardMaterial
+            key={`${index}-${texture.uuid}`}
+            attach={`material-${index}`}
+            map={texture}
+            color={material.solidColor ?? "#ffffff"}
+            roughness={material.roughness ?? 1}
+            metalness={material.metalness ?? 0}
+            emissive={material.emissive}
+            emissiveIntensity={material.emissiveIntensity}
+            transparent={material.transparent}
+            alphaTest={material.alphaTest ?? 0}
+          />
+        ),
+      )}
     </instancedMesh>
   );
 }

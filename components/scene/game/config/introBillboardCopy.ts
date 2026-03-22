@@ -6,9 +6,9 @@ import { getCaretAtPoint } from "troika-three-text";
 export const INTRO_BILLBOARD_TEXT = `Hi, I'm Jesse! \n
 I'm a software engineer under the Road Understanding Team at Waymo, where we build representations that understand the driving elements around the vehicle.
 
-Previously, I obtained my Masters's and Bachelor's degrees in Computer Science from Georgia Tech, where I had the privilege of working with Danfei Xu as part of the Robot Learning and Reasoning Lab (RL2)
+Previously, I obtained my Masters's and Bachelor's in Computer Science from Georgia Tech, where I had the privilege of working with Danfei Xu as part of the Robot Learning and Reasoning Lab (RL2).
 
-Largely, I'm interested in the intersection of robotics, vision, and graphics`;
+Largely, I'm interested in the intersection of robotics, vision, and graphics.`;
 
 export type IntroTextLink = {
   start: number;
@@ -34,20 +34,33 @@ export const INTRO_TEXT_LINKS: IntroTextLink[] = [
   },
 ];
 
-/** Body text (Google-Doc-style link blue on near-white background). */
-const COLOR_BODY = 0xf8fafc;
-const COLOR_LINK = 0x0865C9;
-;
+/** `#RRGGBB` / `#RGB` → troika packed RGB integer. */
+export function hexCssToTroikaInt(hex: string): number {
+  const n = hex.trim().replace(/^#/, "");
+  if (n.length === 3) {
+    const r = parseInt(n[0] + n[0], 16);
+    const g = parseInt(n[1] + n[1], 16);
+    const b = parseInt(n[2] + n[2], 16);
+    return (r << 16) | (g << 8) | b;
+  }
+  if (n.length === 6) return parseInt(n, 16);
+  return 0xffffff;
+}
 
 /**
  * Troika `colorRanges`: at each key index, color applies from that character until the next key.
  */
-export function buildIntroTextColorRanges(): Record<number, number> {
-  const ranges: Record<number, number> = { 0: COLOR_BODY };
+export function buildIntroTextColorRanges(
+  bodyHex = "#f8fafc",
+  linkHex = "#0865c9",
+): Record<number, number> {
+  const body = hexCssToTroikaInt(bodyHex);
+  const link = hexCssToTroikaInt(linkHex);
+  const ranges: Record<number, number> = { 0: body };
   const sorted = [...INTRO_TEXT_LINKS].sort((a, b) => a.start - b.start);
-  for (const link of sorted) {
-    ranges[link.start] = COLOR_LINK;
-    ranges[link.end] = COLOR_BODY;
+  for (const l of sorted) {
+    ranges[l.start] = link;
+    ranges[l.end] = body;
   }
   return ranges;
 }

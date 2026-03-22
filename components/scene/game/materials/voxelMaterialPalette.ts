@@ -45,10 +45,11 @@ export const voxelMaterialPalette = {
   /** Spawn billboard backing: flat, bright, low-chroma surface for text/images without busy stone grain. */
   spawnBoard: {
     textures: { all: "/textures/world/solid-white.svg" },
-    solidColor: "#f2f8ff",
+    solidColor: "#E6E6E6",
     uiColor: "#dce8f5",
     roughness: 0.88,
     metalness: 0,
+    unlit: true,
   },
   path: { textures: { all: "/textures/world/path.svg" }, uiColor: "#b89b6f", roughness: 0.96 },
   stone: { textures: { all: "/textures/world/stone.svg" }, uiColor: "#9f9380", roughness: 1 },

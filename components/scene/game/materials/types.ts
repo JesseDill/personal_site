@@ -18,6 +18,8 @@ export type MaterialDefinition = {
   metalness?: number;
   emissive?: string;
   emissiveIntensity?: number;
+  /** Render with a light-independent material so world lighting/shadows do not change its appearance. */
+  unlit?: boolean;
   transparent?: boolean;
   alphaTest?: number;
 };
