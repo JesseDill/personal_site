@@ -1,71 +1,97 @@
 import GameScene from "@/components/scene/GameScene";
-
-const fallbackSections = [
-  {
-    id: "about-section",
-    eyebrow: "Spawn Cabin",
-    title: "About",
-    body: "Use this section for the recruiter-friendly introduction: your role focus, specialties, and the kinds of teams or products you want to work on next.",
-  },
-  {
-    id: "resume-section",
-    eyebrow: "Resume Keep",
-    title: "Resume",
-    body: "Add the fastest possible scan here: current title, years of experience, a few impact bullets, and a downloadable resume PDF.",
-  },
-  {
-    id: "projects-section",
-    eyebrow: "Projects Forge",
-    title: "Projects",
-    body: "Turn your strongest work into short case studies with screenshots, outcomes, architecture notes, and links to live demos or source.",
-  },
-  {
-    id: "research-section",
-    eyebrow: "Research Lab",
-    title: "Research",
-    body: "Feature experiments, papers, prototypes, or technical investigations that show how you think through ambiguous problems.",
-  },
-  {
-    id: "contact-section",
-    eyebrow: "Contact Portal",
-    title: "Contact",
-    body: "Make outreach easy with direct email, LinkedIn, GitHub, and any scheduling link or preferred way to start a conversation.",
-  },
-] as const;
+import { renderLinkedBillboardText } from "@/components/classic/renderLinkedBillboardText";
+import { INTRO_BILLBOARD_TEXT, INTRO_TEXT_LINKS } from "@/components/scene/game/config/introBillboardCopy";
+import { PUBLICATION_BODY_TEXT, PUBLICATION_TEXT_LINKS } from "@/components/scene/game/config/publicationsBillboardCopy";
+import {
+  githubProfileUrl,
+  googleScholarProfileUrl,
+  linkedinProfileUrl,
+} from "@/components/scene/game/config/socialLinks";
+import { spawnBillboardLayout } from "@/components/scene/game/config/spawnBillboardLayout";
 
 export default function HomePage() {
+  const { photo, introText: intro, publications: pub } = spawnBillboardLayout;
+  const pubText = pub.text ?? {};
+
+  const sectionBaseStyle = {
+    ["--fb-body" as string]: intro.color ?? "#000000",
+    ["--fb-link" as string]: intro.linkColor ?? "#004182",
+  };
+
+  const introRowStyle = {
+    ...sectionBaseStyle,
+  };
+
+  const publicationRowStyle = {
+    ["--fb-body" as string]: pubText.bodyFill ?? intro.color ?? "#000000",
+    ["--fb-link" as string]: pubText.link ?? intro.linkColor ?? "#004182",
+    ["--pub-heading" as string]: pubText.headingFill ?? "#000000",
+  };
+
   return (
     <main id="top">
       <section className="desktop-scene" aria-label="Interactive 3D portfolio world">
         <GameScene />
       </section>
 
-      <section id="fallback" className="fallback">
+      <section id="fallback" className="fallback fallback--spawn-matched" style={sectionBaseStyle}>
         <div className="fallback-inner">
-          <header className="fallback-hero">
-            <p className="fallback-kicker">Straight-to-the-point mode</p>
-            <h2>Classic portfolio layout</h2>
-            <p>
-              Every landmark in the world maps to a section here, so the playful 3D shell never gets in the way of
-              someone who just wants the resume version.
-            </p>
-          </header>
+          <div className="fallback-matched-column">
+            <p className="fallback-billboard-kicker">Classic view — same copy and links as the spawn wall</p>
 
-          <div className="fallback-grid">
-            {fallbackSections.map((section) => (
-              <article key={section.id} id={section.id}>
-                <p className="section-kicker">{section.eyebrow}</p>
-                <h3>{section.title}</h3>
-                <p>{section.body}</p>
-                {section.id === "contact-section" ? (
-                  <div className="section-actions">
-                    <a className="section-link" href="mailto:hello@example.com">
-                      hello@example.com
-                    </a>
+            <div className="fallback-spawn-row fallback-spawn-row--intro" style={introRowStyle}>
+              <div className="fallback-spawn-intro">
+                <div className="fallback-spawn-intro-body">
+                  {renderLinkedBillboardText(
+                    INTRO_BILLBOARD_TEXT,
+                    INTRO_TEXT_LINKS.map(({ start, end, href }) => ({ start, end, href })),
+                    "intro",
+                  )}
+                </div>
+              </div>
+              <div className="fallback-spawn-sidebar">
+                <div className="fallback-spawn-photo">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.texturePath} alt="" width={560} height={560} />
+                </div>
+                <div className="fallback-social-row" aria-label="Social links">
+                  <a className="fallback-social-link" href={linkedinProfileUrl} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/textures/world/linkedin-logo.svg" alt="" width={22} height={22} />
+                    LinkedIn
+                  </a>
+                  <a className="fallback-social-link" href={googleScholarProfileUrl} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/textures/world/google-scholar-logo.svg" alt="" width={22} height={22} />
+                    Google Scholar
+                  </a>
+                  <a className="fallback-social-link" href={githubProfileUrl} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/textures/world/github-logo.svg" alt="" width={22} height={22} />
+                    GitHub
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="fallback-spawn-row fallback-publication-row" style={publicationRowStyle}>
+              <div className="fallback-publication-grid">
+                <h2 className="fallback-publications-heading">Publications</h2>
+                <div className="fallback-publication-thumb">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pub.gif.path} alt="" width={512} height={512} />
+                </div>
+                <div className="fallback-publication-copy">
+                  <div className="fallback-spawn-intro-body fallback-publication-body">
+                    {renderLinkedBillboardText(
+                      PUBLICATION_BODY_TEXT,
+                      PUBLICATION_TEXT_LINKS.map(({ start, end, href }) => ({ start, end, href })),
+                      "pub",
+                    )}
                   </div>
-                ) : null}
-              </article>
-            ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
