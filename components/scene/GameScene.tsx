@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
 import { hotbarSlotCount } from "./game/config/inventory";
+import { spawnCursorImageSrc } from "./game/config/spawnCursor";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
 import { buildIntroTextColorRanges } from "./game/config/introBillboardCopy";
 import { getSocialSignPositions, spawnBillboardLayout } from "./game/config/spawnBillboardLayout";
@@ -501,6 +502,8 @@ export default function GameScene() {
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
         crosshairScreenPosition={locked ? spawnCursorScreenPosition : null}
+        spawnLookUnlocked={spawnLookUnlocked}
+        spawnCursorImageSrc={spawnCursorImageSrc}
         hotbarSlots={hotbarSlots}
         selectedInventorySlot={selectedInventorySlot}
         collectedInventory={collectedInventory}
