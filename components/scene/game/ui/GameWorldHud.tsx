@@ -14,6 +14,7 @@ type GameWorldHudProps = {
   onRequestPointerLock: () => void;
   activePanel: boolean;
   targetLabel: string | null;
+  crosshairScreenPosition?: { x: number; y: number } | null;
   hotbarSlots: (DroppedBlockItem["material"] | null)[];
   selectedInventorySlot: number;
   collectedInventory: Record<DroppedBlockItem["material"], number>;
@@ -29,6 +30,7 @@ export function GameWorldHud({
   onRequestPointerLock,
   activePanel,
   targetLabel,
+  crosshairScreenPosition,
   hotbarSlots,
   selectedInventorySlot,
   collectedInventory,
@@ -36,6 +38,13 @@ export function GameWorldHud({
   onHoverMaterial,
   onSlotMouseLeave,
 }: GameWorldHudProps) {
+  const crosshairStyle = crosshairScreenPosition
+    ? { left: `${crosshairScreenPosition.x}px`, top: `${crosshairScreenPosition.y}px` }
+    : undefined;
+  const tooltipStyle = crosshairScreenPosition
+    ? { left: `${crosshairScreenPosition.x}px`, top: `${crosshairScreenPosition.y + 22}px` }
+    : undefined;
+
   return (
     <div className="hud">
       {!locked && !isPaused ? (
@@ -49,9 +58,13 @@ export function GameWorldHud({
         />
       ) : null}
 
-      <div className={`crosshair${!locked ? " crosshair--hidden" : ""}`} aria-hidden="true" />
+      <div className={`crosshair${!locked ? " crosshair--hidden" : ""}`} style={crosshairStyle} aria-hidden="true" />
 
-      {targetLabel && locked ? <div className="tooltip">{targetLabel}</div> : null}
+      {targetLabel && locked ? (
+        <div className="tooltip" style={tooltipStyle}>
+          {targetLabel}
+        </div>
+      ) : null}
 
       <section
         className={`collected-inventory${isPaused ? " collected-inventory--pause-front" : ""}`}

@@ -48,13 +48,18 @@ const spawnSocialPositions = getSocialSignPositions();
  * empty and no listener is ever attached. UI buttons call `canvas.requestPointerLock()` directly instead.
  */
 const POINTER_LOCK_CONTROLS_SELECTOR = "#__pointer_lock_no_auto_click__";
+const POINTER_LOCK_LOOK_SPEED = 1;
+const POINTER_LOCK_FROZEN_SPEED = 0;
+const SPAWN_LOOK_UNLOCK_KEYS = new Set(["Space", "KeyW", "KeyA", "KeyS", "KeyD"]);
 
 function ScenePointerLockControls({
   onLock,
   onUnlock,
+  pointerSpeed,
 }: {
   onLock: () => void;
   onUnlock: () => void;
+  pointerSpeed: number;
 }) {
   const gl = useThree((s) => s.gl);
   return (
@@ -63,6 +68,7 @@ function ScenePointerLockControls({
       selector={POINTER_LOCK_CONTROLS_SELECTOR}
       onLock={onLock}
       onUnlock={onUnlock}
+      pointerSpeed={pointerSpeed}
     />
   );
 }
@@ -81,6 +87,8 @@ export default function GameScene() {
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
   const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<DroppedBlockItem["material"] | null>(null);
   const [hasEnteredWorldThisSession, setHasEnteredWorldThisSession] = useState(false);
+  const [spawnLookUnlocked, setSpawnLookUnlocked] = useState(false);
+  const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
     dirt: 0,
@@ -106,12 +114,22 @@ export default function GameScene() {
   const requestWorldPointerLock = useCallback(() => {
     worldCanvasElRef.current?.requestPointerLock();
   }, []);
+  const getCanvasRect = useCallback(() => {
+    return worldCanvasElRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+  }, []);
+  const resetSpawnCursorToViewportCenter = useCallback(() => {
+    const rect = getCanvasRect();
+    setSpawnCursorScreenPosition({ x: rect.width / 2, y: rect.height / 2 });
+  }, [getCanvasRect]);
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
   const handlePointerLockGained = useCallback(() => {
     setLocked(true);
     setHasEnteredWorldThisSession(true);
-  }, []);
+    if (!spawnLookUnlocked) {
+      resetSpawnCursorToViewportCenter();
+    }
+  }, [resetSpawnCursorToViewportCenter, spawnLookUnlocked]);
 
   const handlePointerLockLost = useCallback(() => {
     setLocked(false);
@@ -240,6 +258,46 @@ export default function GameScene() {
   }, [activePanel, locked]);
 
   useEffect(() => {
+    if (!locked || spawnLookUnlocked) return;
+
+    const unlockSpawnLook = () => {
+      setSpawnLookUnlocked(true);
+      resetSpawnCursorToViewportCenter();
+    };
+    const handleSpawnMouseMove = (event: MouseEvent) => {
+      const rect = getCanvasRect();
+      const width = Math.max(rect.width, 1);
+      const height = Math.max(rect.height, 1);
+      const current = spawnCursorScreenPosition ?? { x: width / 2, y: height / 2 };
+      const nextX = THREE.MathUtils.clamp(current.x + event.movementX, 0, width);
+      const nextY = THREE.MathUtils.clamp(current.y + event.movementY, 0, height);
+
+      setSpawnCursorScreenPosition({ x: nextX, y: nextY });
+      if (nextX <= 0 || nextX >= width || nextY <= 0 || nextY >= height) {
+        unlockSpawnLook();
+      }
+    };
+    const handleSpawnKeyDown = (event: KeyboardEvent) => {
+      if (SPAWN_LOOK_UNLOCK_KEYS.has(event.code)) {
+        unlockSpawnLook();
+      }
+    };
+
+    window.addEventListener("mousemove", handleSpawnMouseMove);
+    window.addEventListener("keydown", handleSpawnKeyDown);
+    return () => {
+      window.removeEventListener("mousemove", handleSpawnMouseMove);
+      window.removeEventListener("keydown", handleSpawnKeyDown);
+    };
+  }, [getCanvasRect, locked, resetSpawnCursorToViewportCenter, spawnCursorScreenPosition, spawnLookUnlocked]);
+
+  useEffect(() => {
+    if (spawnLookUnlocked || !locked) {
+      resetSpawnCursorToViewportCenter();
+    }
+  }, [locked, resetSpawnCursorToViewportCenter, spawnLookUnlocked]);
+
+  useEffect(() => {
     const handleClick = () => {
       if (!locked) return;
 
@@ -295,6 +353,17 @@ export default function GameScene() {
 
   const selectedInventoryMaterial = hotbarSlots[selectedInventorySlot] ?? null;
   const heldInventoryMaterial = hoveredInventoryMaterial ?? selectedInventoryMaterial;
+  const interactionPointerNdc = useMemo(() => {
+    if (!locked || spawnLookUnlocked || !spawnCursorScreenPosition) {
+      return { x: 0, y: 0 };
+    }
+    const rect = getCanvasRect();
+    if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+    return {
+      x: (spawnCursorScreenPosition.x / rect.width) * 2 - 1,
+      y: -((spawnCursorScreenPosition.y / rect.height) * 2 - 1),
+    };
+  }, [getCanvasRect, locked, spawnCursorScreenPosition, spawnLookUnlocked]);
   const visibleTerrainBlocks = useMemo(
     () => composeVisibleTerrainBlocks(worldBlocks, removedTerrainBlockKeys, placedTerrainBlocks),
     [placedTerrainBlocks, removedTerrainBlockKeys],
@@ -408,8 +477,12 @@ export default function GameScene() {
         ) : null}
 
         <PlayerController enabled={locked} onMovingChange={setPlayerMoving} getOccupancySnapshot={getOccupancySnapshot} />
-        <InteractionRaycast onTarget={onTarget} />
-        <ScenePointerLockControls onLock={handlePointerLockGained} onUnlock={handlePointerLockLost} />
+        <InteractionRaycast onTarget={onTarget} pointerNdc={interactionPointerNdc} />
+        <ScenePointerLockControls
+          onLock={handlePointerLockGained}
+          onUnlock={handlePointerLockLost}
+          pointerSpeed={spawnLookUnlocked ? POINTER_LOCK_LOOK_SPEED : POINTER_LOCK_FROZEN_SPEED}
+        />
       </Canvas>
 
       <GameWorldHud
@@ -419,6 +492,7 @@ export default function GameScene() {
         onRequestPointerLock={requestWorldPointerLock}
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
+        crosshairScreenPosition={locked ? spawnCursorScreenPosition : null}
         hotbarSlots={hotbarSlots}
         selectedInventorySlot={selectedInventorySlot}
         collectedInventory={collectedInventory}

@@ -7,8 +7,10 @@ import type { InteractionId } from "@/data/interactions";
 
 export function InteractionRaycast({
   onTarget,
+  pointerNdc,
 }: {
   onTarget: (id: InteractionId | null, label: string | null, href: string | null) => void;
+  pointerNdc?: { x: number; y: number };
 }) {
   const { camera, scene } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -19,7 +21,7 @@ export function InteractionRaycast({
   });
 
   useFrame(() => {
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    raycaster.setFromCamera(new THREE.Vector2(pointerNdc?.x ?? 0, pointerNdc?.y ?? 0), camera);
     const hits = raycaster.intersectObjects(scene.children, true);
 
     let nextTarget: { id: InteractionId | null; label: string | null; href: string | null } = {
