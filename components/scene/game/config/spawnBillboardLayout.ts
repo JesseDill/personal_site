@@ -95,10 +95,10 @@ export const spawnBillboardLayout: {
     position: [0.55, 3.38, 6.49],
     font: "/fonts/IBMPlexMono-Light.ttf",
     gif: {
-      path: "/textures/world/uncertainty.gif",
-      width: 2.02,
-      height: 2.02,
-      position: [-1.48, -0.55, 0.03],
+      path: "/textures/world/room_uncertainty_visual.png",
+      width: 1.56,
+      height: 1.56,
+      position: [-1.78, -0.39, 0.03],
     },
     text: {
       headingFill: "#000000",
@@ -114,7 +114,7 @@ export const spawnBillboardLayout: {
       outlineWidth: 0.001,//0.012,
     },
     body: {
-      position: [-0.3, 0.04, 0.04],
+      position: [-0.9, 0.04, 0.04],
       fontSize: 0.10,
       maxWidth: 4.15,
       lineHeight: 1.24,
