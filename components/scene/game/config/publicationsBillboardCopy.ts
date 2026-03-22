@@ -8,7 +8,7 @@ const PAPER_TITLE = "Neural Visibility Field for Uncertainty-Driven Active Mappi
 const AUTHORS_LINE =
   "Shangjie Xue, Jesse Dill, Pranay Mathur, Frank Dellaert, Panagiotis Tsiotras, Danfei Xu";
 
-const VENUE_LINE = "IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) 2024";
+const VENUE_LINE = "CVPR 2024";
 
 /** Body only (heading “Publications” is a separate `<Text>`). */
 export const PUBLICATION_BODY_TEXT = `${PAPER_TITLE}
