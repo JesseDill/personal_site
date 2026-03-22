@@ -54,21 +54,36 @@ export default function HomePage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photo.texturePath} alt="" width={560} height={560} />
                 </div>
-                <div className="fallback-social-row" aria-label="Social links">
-                  <a className="fallback-social-link" href={linkedinProfileUrl} target="_blank" rel="noopener noreferrer">
+                <div className="fallback-social-row" role="group" aria-label="Social links">
+                  <a
+                    className="fallback-social-link"
+                    href={linkedinProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="LinkedIn"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/linkedin-logo.svg" alt="" width={22} height={22} />
-                    LinkedIn
+                    <img src="/textures/world/linkedin-logo.svg" alt="" width={24} height={24} />
                   </a>
-                  <a className="fallback-social-link" href={googleScholarProfileUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className="fallback-social-link"
+                    href={googleScholarProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Google Scholar"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/google-scholar-logo.svg" alt="" width={22} height={22} />
-                    Google Scholar
+                    <img src="/textures/world/google-scholar-logo.svg" alt="" width={24} height={24} />
                   </a>
-                  <a className="fallback-social-link" href={githubProfileUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className="fallback-social-link"
+                    href={githubProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="GitHub"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/github-logo.svg" alt="" width={22} height={22} />
-                    GitHub
+                    <img src="/textures/world/github-logo.svg" alt="" width={24} height={24} />
                   </a>
                 </div>
               </div>
