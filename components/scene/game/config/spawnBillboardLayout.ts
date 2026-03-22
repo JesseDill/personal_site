@@ -67,7 +67,7 @@ export const spawnBillboardLayout: {
   },
   introText: {
     position: [3.05, 5.15, 6.49],
-    fontSize: 0.13,
+    fontSize: 0.11,
     maxWidth: 4.55,
     lineHeight: 1.24,
     outlineWidth: 0.012,
@@ -80,16 +80,16 @@ export const spawnBillboardLayout: {
       path: "/textures/world/uncertainty.gif",
       width: 2.02,
       height: 2.02,
-      position: [-1.08, -0.4, 0.03],
+      position: [-1.48, -0.55, 0.03],
     },
     heading: {
-      position: [0.2, 0.46, 0.04],
+      position: [-2.5, 0.4, 0.04],
       fontSize: 0.19,
       maxWidth: 4.35,
       outlineWidth: 0.012,
     },
     body: {
-      position: [0.2, 0.18, 0.04],
+      position: [-0.3, 0.04, 0.04],
       fontSize: 0.105,
       maxWidth: 4.15,
       lineHeight: 1.24,
