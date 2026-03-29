@@ -10,4 +10,11 @@ export const healthConfig = {
   criticalHealthThreshold: 1,
   /** Duration (ms) of the screen-shake effect when a health point is lost. */
   screenShakeDurationMs: 350,
+  /**
+   * Fall damage uses `max(0, floor(fallDistanceBlocks) - fallDamageSafeDistance)` half-heart points.
+   * Fall damage can reduce health to 0 (unlike starvation).
+   */
+  fallDamageSafeDistance: 3,
+  /** Maximum half-heart points removable in one fall (same scale as maxHealth). */
+  fallDamageMaxPoints: 20,
 } as const;

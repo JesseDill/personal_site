@@ -21,6 +21,7 @@ export function PlayerController({
   enabled,
   onMovingChange,
   onDistanceWalked,
+  onFallLand,
   getOccupancySnapshot,
   sprintAllowed = true,
 }: {
@@ -28,6 +29,8 @@ export function PlayerController({
   onMovingChange: (moving: boolean) => void;
   /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
   onDistanceWalked?: (distance: number) => void;
+  /** Vertical drop in blocks from peak feet height while airborne to landing feet Y. */
+  onFallLand?: (fallDistance: number) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
   /** When false, Shift does not increase forward speed (e.g. low hunger). */
   sprintAllowed?: boolean;
@@ -43,6 +46,10 @@ export function PlayerController({
   const wasEnabledRef = useRef(enabled);
   const onDistanceWalkedRef = useRef(onDistanceWalked);
   onDistanceWalkedRef.current = onDistanceWalked;
+  const onFallLandRef = useRef(onFallLand);
+  onFallLandRef.current = onFallLand;
+  /** Highest feet Y reached during current airborne segment; cleared on ground. */
+  const airbornePeakFeetRef = useRef<number | null>(null);
 
   useEffect(() => {
     camera.position.set(...playerSpawnPosition);
@@ -50,6 +57,7 @@ export function PlayerController({
     verticalVelocityRef.current = 0;
     groundedRef.current = true;
     jumpQueuedRef.current = false;
+    airbornePeakFeetRef.current = null;
   }, [camera]);
 
   useEffect(() => {
@@ -89,10 +97,12 @@ export function PlayerController({
     keysRef.current.KeyD = false;
     keysRef.current.ShiftLeft = false;
     keysRef.current.ShiftRight = false;
+    airbornePeakFeetRef.current = null;
   }, [enabled, onMovingChange]);
 
   useFrame((_state, delta) => {
     if (!enabled) return;
+    const wasGroundedAtFrameStart = groundedRef.current;
     const snapshot = getOccupancySnapshot();
     const speed = 4.25;
     const currentFeetY = camera.position.y - playerCollisionConfig.eyeHeight;
@@ -193,6 +203,24 @@ export function PlayerController({
           groundedRef.current = false;
         }
       }
+    }
+
+    const isGroundedAfterPhysics = groundedRef.current;
+    if (isGroundedAfterPhysics) {
+      if (!wasGroundedAtFrameStart) {
+        const peak = airbornePeakFeetRef.current;
+        if (peak !== null) {
+          const fallDistance = peak - nextFeetY;
+          if (fallDistance > 0.05) {
+            onFallLandRef.current?.(fallDistance);
+          }
+        }
+        airbornePeakFeetRef.current = null;
+      } else {
+        airbornePeakFeetRef.current = null;
+      }
+    } else {
+      airbornePeakFeetRef.current = Math.max(airbornePeakFeetRef.current ?? nextFeetY, nextFeetY);
     }
 
     const prevX = camera.position.x;

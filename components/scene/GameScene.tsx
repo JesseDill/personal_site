@@ -176,7 +176,31 @@ export default function GameScene() {
 
   const [screenShakeActive, setScreenShakeActive] = useState(false);
   const screenShakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const healthCriticalWobble = health <= healthConfig.criticalHealthThreshold;
+  const healthCriticalWobble = health === healthConfig.criticalHealthThreshold;
+
+  const triggerDamageFeedback = useCallback(() => {
+    setScreenShakeActive(true);
+    if (screenShakeTimerRef.current) clearTimeout(screenShakeTimerRef.current);
+    screenShakeTimerRef.current = setTimeout(
+      () => setScreenShakeActive(false),
+      healthConfig.screenShakeDurationMs,
+    );
+  }, []);
+
+  const handleFallLand = useCallback(
+    (fallDistance: number) => {
+      const blocks = Math.floor(fallDistance);
+      const rawDamage = Math.max(0, blocks - healthConfig.fallDamageSafeDistance);
+      const damage = Math.min(rawDamage, healthConfig.fallDamageMaxPoints);
+      if (damage <= 0) return;
+      setHealth((prev) => {
+        const next = Math.max(prev - damage, 0);
+        if (next < prev) triggerDamageFeedback();
+        return next;
+      });
+    },
+    [triggerDamageFeedback],
+  );
 
   useEffect(() => {
     if (hunger > 0 || health <= healthConfig.starvationMinHealth) return;
@@ -185,19 +209,14 @@ export default function GameScene() {
       setHealth((prev) => {
         const next = Math.max(prev - 1, healthConfig.starvationMinHealth);
         if (next < prev) {
-          setScreenShakeActive(true);
-          if (screenShakeTimerRef.current) clearTimeout(screenShakeTimerRef.current);
-          screenShakeTimerRef.current = setTimeout(
-            () => setScreenShakeActive(false),
-            healthConfig.screenShakeDurationMs,
-          );
+          triggerDamageFeedback();
         }
         return next;
       });
     }, healthConfig.starvationDamageIntervalMs);
 
     return () => clearInterval(interval);
-  }, [hunger, health]);
+  }, [hunger, health, triggerDamageFeedback]);
 
   useEffect(() => {
     return () => {
@@ -545,6 +564,7 @@ export default function GameScene() {
           enabled={locked}
           onMovingChange={setPlayerMoving}
           onDistanceWalked={handleDistanceWalked}
+          onFallLand={handleFallLand}
           getOccupancySnapshot={getOccupancySnapshot}
           sprintAllowed={hunger > hungerConfig.sprintHungerCutoff}
         />
