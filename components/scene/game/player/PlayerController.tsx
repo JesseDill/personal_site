@@ -7,6 +7,9 @@ import {
   playerCollisionConfig,
   playerSpawnPosition,
   playerSpawnRotation,
+  playerSneakDiagonalSpeedMultiplier,
+  playerSneakHeightFactor,
+  playerSneakSpeedMultiplier,
   playerSprintMultiplier,
 } from "../config/player";
 import {
@@ -16,6 +19,21 @@ import {
   resolveUpwardFeetPositionWithCeiling,
 } from "../physics/playerSupport";
 import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
+
+function hasFeetSupport(
+  snapshot: TerrainOccupancySnapshot,
+  x: number,
+  feetY: number,
+  z: number,
+): boolean {
+  const top = getHighestSupportBelowFeet(
+    snapshot,
+    x,
+    feetY + playerCollisionConfig.stepHeight,
+    z,
+  );
+  return top >= feetY - 0.01;
+}
 
 export function PlayerController({
   enabled,
@@ -53,6 +71,7 @@ export function PlayerController({
   onFallLandRef.current = onFallLand;
   /** Highest feet Y reached during current airborne segment; cleared on ground. */
   const airbornePeakFeetRef = useRef<number | null>(null);
+  const sneakingRef = useRef(false);
 
   useEffect(() => {
     camera.position.set(...playerSpawnPosition);
@@ -69,6 +88,9 @@ export function PlayerController({
     keysRef.current.KeyD = false;
     keysRef.current.ShiftLeft = false;
     keysRef.current.ShiftRight = false;
+    keysRef.current.ControlLeft = false;
+    keysRef.current.ControlRight = false;
+    sneakingRef.current = false;
   }, [camera, onMovingChange, respawnToken]);
 
   useEffect(() => {
@@ -108,6 +130,9 @@ export function PlayerController({
     keysRef.current.KeyD = false;
     keysRef.current.ShiftLeft = false;
     keysRef.current.ShiftRight = false;
+    keysRef.current.ControlLeft = false;
+    keysRef.current.ControlRight = false;
+    sneakingRef.current = false;
     airbornePeakFeetRef.current = null;
   }, [enabled, onMovingChange]);
 
@@ -115,8 +140,12 @@ export function PlayerController({
     if (!enabled) return;
     const wasGroundedAtFrameStart = groundedRef.current;
     const snapshot = getOccupancySnapshot();
+    const wasSneakingLastFrame = sneakingRef.current;
+    const lastEyeHeight = wasSneakingLastFrame
+      ? playerCollisionConfig.eyeHeight * playerSneakHeightFactor
+      : playerCollisionConfig.eyeHeight;
+    const currentFeetY = camera.position.y - lastEyeHeight;
     const speed = 4.25;
-    const currentFeetY = camera.position.y - playerCollisionConfig.eyeHeight;
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     forward.y = 0;
@@ -131,10 +160,21 @@ export function PlayerController({
     if (keysRef.current.KeyD) movement.add(right);
 
     const wantsToMove = movement.lengthSq() > 0;
+    const ctrlHeld = Boolean(keysRef.current.ControlLeft || keysRef.current.ControlRight);
+    const shiftHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
+    const sneaking = ctrlHeld && !(shiftHeld && wantsToMove) && groundedRef.current;
+
     if (movingRef.current !== wantsToMove) {
       movingRef.current = wantsToMove;
       onMovingChange(wantsToMove);
     }
+
+    const activeEyeHeight = sneaking
+      ? playerCollisionConfig.eyeHeight * playerSneakHeightFactor
+      : playerCollisionConfig.eyeHeight;
+    const activeBodyHeight = sneaking
+      ? playerCollisionConfig.height * playerSneakHeightFactor
+      : playerCollisionConfig.height;
 
     let nextX = camera.position.x;
     let nextZ = camera.position.z;
@@ -143,30 +183,76 @@ export function PlayerController({
     if (wantsToMove) {
       const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
       const forwardSprint = sprintAllowed && sprintHeld && keysRef.current.KeyW;
-      const moveSpeed = forwardSprint ? speed * playerSprintMultiplier : speed;
+      let moveSpeed = speed;
+      if (sneaking) {
+        const diagonal =
+          (keysRef.current.KeyW || keysRef.current.KeyS) &&
+          (keysRef.current.KeyA || keysRef.current.KeyD);
+        moveSpeed = diagonal
+          ? speed * playerSneakDiagonalSpeedMultiplier
+          : speed * playerSneakSpeedMultiplier;
+      } else if (forwardSprint) {
+        moveSpeed = speed * playerSprintMultiplier;
+      }
       movement.normalize().multiplyScalar(moveSpeed * delta);
 
       const candidateX = camera.position.x + movement.x;
       const candidateZ = camera.position.z + movement.z;
 
-      if (canPlayerOccupyFeetPosition(snapshot, candidateX, nextFeetY, camera.position.z)) {
-        nextX = candidateX;
+      let proposedFeetY = nextFeetY;
+      let canMoveX = false;
+      if (canPlayerOccupyFeetPosition(snapshot, candidateX, nextFeetY, camera.position.z, activeBodyHeight)) {
+        canMoveX = true;
       } else if (groundedRef.current) {
-        const steppedFeetY = findStepUpFeetHeight(snapshot, candidateX, nextFeetY, camera.position.z);
+        const steppedFeetY = findStepUpFeetHeight(
+          snapshot,
+          candidateX,
+          nextFeetY,
+          camera.position.z,
+          activeBodyHeight,
+        );
         if (steppedFeetY !== null) {
-          nextX = candidateX;
-          nextFeetY = steppedFeetY;
+          proposedFeetY = steppedFeetY;
+          canMoveX = true;
         }
       }
-
-      if (canPlayerOccupyFeetPosition(snapshot, nextX, nextFeetY, candidateZ)) {
-        nextZ = candidateZ;
-      } else if (groundedRef.current) {
-        const steppedFeetY = findStepUpFeetHeight(snapshot, nextX, nextFeetY, candidateZ);
-        if (steppedFeetY !== null) {
-          nextZ = candidateZ;
-          nextFeetY = steppedFeetY;
+      if (canMoveX && sneaking && groundedRef.current) {
+        if (!hasFeetSupport(snapshot, candidateX, proposedFeetY, camera.position.z)) {
+          canMoveX = false;
+          proposedFeetY = nextFeetY;
         }
+      }
+      if (canMoveX) {
+        nextX = candidateX;
+        nextFeetY = proposedFeetY;
+      }
+
+      proposedFeetY = nextFeetY;
+      let canMoveZ = false;
+      if (canPlayerOccupyFeetPosition(snapshot, nextX, nextFeetY, candidateZ, activeBodyHeight)) {
+        canMoveZ = true;
+      } else if (groundedRef.current) {
+        const steppedFeetY = findStepUpFeetHeight(
+          snapshot,
+          nextX,
+          nextFeetY,
+          candidateZ,
+          activeBodyHeight,
+        );
+        if (steppedFeetY !== null) {
+          proposedFeetY = steppedFeetY;
+          canMoveZ = true;
+        }
+      }
+      if (canMoveZ && sneaking && groundedRef.current) {
+        if (!hasFeetSupport(snapshot, nextX, proposedFeetY, candidateZ)) {
+          canMoveZ = false;
+          proposedFeetY = nextFeetY;
+        }
+      }
+      if (canMoveZ) {
+        nextZ = candidateZ;
+        nextFeetY = proposedFeetY;
       }
     }
 
@@ -180,7 +266,14 @@ export function PlayerController({
     const targetFeetY = nextFeetY + verticalVelocityRef.current * delta;
 
     if (verticalVelocityRef.current > 0) {
-      nextFeetY = resolveUpwardFeetPositionWithCeiling(snapshot, nextX, nextFeetY, targetFeetY, nextZ);
+      nextFeetY = resolveUpwardFeetPositionWithCeiling(
+        snapshot,
+        nextX,
+        nextFeetY,
+        targetFeetY,
+        nextZ,
+        activeBodyHeight,
+      );
       if (nextFeetY < targetFeetY) {
         verticalVelocityRef.current = 0;
       }
@@ -243,7 +336,8 @@ export function PlayerController({
       onDistanceWalkedRef.current?.(dist);
     }
 
-    camera.position.set(nextX, nextFeetY + playerCollisionConfig.eyeHeight, nextZ);
+    camera.position.set(nextX, nextFeetY + activeEyeHeight, nextZ);
+    sneakingRef.current = sneaking;
   });
 
   return null;

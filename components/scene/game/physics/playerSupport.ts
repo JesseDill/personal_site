@@ -37,7 +37,13 @@ export function getHighestSupportBelowFeet(
   return highestSupport === Number.NEGATIVE_INFINITY ? 0 : highestSupport;
 }
 
-export function canPlayerOccupyFeetPosition(snapshot: TerrainOccupancySnapshot, x: number, feetY: number, z: number) {
+export function canPlayerOccupyFeetPosition(
+  snapshot: TerrainOccupancySnapshot,
+  x: number,
+  feetY: number,
+  z: number,
+  playerBodyHeight: number = playerCollisionConfig.height,
+) {
   const inset = playerCollisionConfig.boundaryPadding + playerCollisionConfig.radius;
   const insideBounds =
     x > worldBounds.minX + inset &&
@@ -52,7 +58,7 @@ export function canPlayerOccupyFeetPosition(snapshot: TerrainOccupancySnapshot, 
   const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
   const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
   const bodyBottom = feetY + 0.001;
-  const bodyTop = feetY + playerCollisionConfig.height - 0.001;
+  const bodyTop = feetY + playerBodyHeight - 0.001;
 
   for (let cellX = xRange.min; cellX <= xRange.max; cellX += 1) {
     for (let cellZ = zRange.min; cellZ <= zRange.max; cellZ += 1) {
@@ -81,7 +87,13 @@ export function canPlayerOccupyFeetPosition(snapshot: TerrainOccupancySnapshot, 
   return true;
 }
 
-export function findStepUpFeetHeight(snapshot: TerrainOccupancySnapshot, x: number, currentFeetY: number, z: number) {
+export function findStepUpFeetHeight(
+  snapshot: TerrainOccupancySnapshot,
+  x: number,
+  currentFeetY: number,
+  z: number,
+  playerBodyHeight: number = playerCollisionConfig.height,
+) {
   const xRange = getOccupiedCellRange(x, playerCollisionConfig.radius);
   const zRange = getOccupiedCellRange(z, playerCollisionConfig.radius);
   let bestStepHeight: number | null = null;
@@ -100,7 +112,7 @@ export function findStepUpFeetHeight(snapshot: TerrainOccupancySnapshot, x: numb
           return;
         }
 
-        if (canPlayerOccupyFeetPosition(snapshot, x, segment.top, z)) {
+        if (canPlayerOccupyFeetPosition(snapshot, x, segment.top, z, playerBodyHeight)) {
           bestStepHeight = bestStepHeight === null ? segment.top : Math.max(bestStepHeight, segment.top);
         }
       });
@@ -116,8 +128,9 @@ export function resolveUpwardFeetPositionWithCeiling(
   currentFeetY: number,
   targetFeetY: number,
   z: number,
+  playerBodyHeight: number = playerCollisionConfig.height,
 ) {
-  if (canPlayerOccupyFeetPosition(snapshot, x, targetFeetY, z)) {
+  if (canPlayerOccupyFeetPosition(snapshot, x, targetFeetY, z, playerBodyHeight)) {
     return targetFeetY;
   }
 
@@ -135,8 +148,8 @@ export function resolveUpwardFeetPositionWithCeiling(
       column.forEach((segment) => {
         if (isSolidSegmentIgnoredForSupport(snapshot, segment)) return;
         if (
-          segment.bottom >= currentFeetY + playerCollisionConfig.height - 0.001 &&
-          segment.bottom < targetFeetY + playerCollisionConfig.height
+          segment.bottom >= currentFeetY + playerBodyHeight - 0.001 &&
+          segment.bottom < targetFeetY + playerBodyHeight
         ) {
           lowestCeiling = Math.min(lowestCeiling, segment.bottom);
         }
@@ -145,7 +158,7 @@ export function resolveUpwardFeetPositionWithCeiling(
   }
 
   if (lowestCeiling !== Number.POSITIVE_INFINITY) {
-    return Math.max(currentFeetY, lowestCeiling - playerCollisionConfig.height);
+    return Math.max(currentFeetY, lowestCeiling - playerBodyHeight);
   }
 
   return currentFeetY;

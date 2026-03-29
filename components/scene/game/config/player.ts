@@ -3,6 +3,13 @@ import { landmarks } from "@/data/world";
 /** Walk speed multiplier when holding Shift while moving forward (W). */
 export const playerSprintMultiplier = 1.3;
 
+/** Sneak (Ctrl): forward/strafe speed vs base walk speed. */
+export const playerSneakSpeedMultiplier = 0.3;
+/** Sneak diagonal (W/S + A/D): combined axis multiplier. */
+export const playerSneakDiagonalSpeedMultiplier = 0.424;
+/** Sneak: eye and body height scale (camera and capsule). */
+export const playerSneakHeightFactor = 0.8333;
+
 export const playerCollisionConfig = {
   radius: 0.34,
   height: 1.8,
