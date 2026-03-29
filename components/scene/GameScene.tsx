@@ -514,6 +514,7 @@ export default function GameScene() {
           onMovingChange={setPlayerMoving}
           onDistanceWalked={handleDistanceWalked}
           getOccupancySnapshot={getOccupancySnapshot}
+          sprintAllowed={hunger > hungerConfig.sprintHungerCutoff}
         />
         <InteractionRaycast onTarget={onTarget} pointerNdc={interactionPointerNdc} />
         <ScenePointerLockControls

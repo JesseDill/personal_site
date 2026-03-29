@@ -22,12 +22,15 @@ export function PlayerController({
   onMovingChange,
   onDistanceWalked,
   getOccupancySnapshot,
+  sprintAllowed = true,
 }: {
   enabled: boolean;
   onMovingChange: (moving: boolean) => void;
   /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
   onDistanceWalked?: (distance: number) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
+  /** When false, Shift does not increase forward speed (e.g. low hunger). */
+  sprintAllowed?: boolean;
 }) {
   const { camera } = useThree();
   const keysRef = useRef<Record<string, boolean>>({});
@@ -118,7 +121,7 @@ export function PlayerController({
 
     if (wantsToMove) {
       const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
-      const forwardSprint = sprintHeld && keysRef.current.KeyW;
+      const forwardSprint = sprintAllowed && sprintHeld && keysRef.current.KeyW;
       const moveSpeed = forwardSprint ? speed * playerSprintMultiplier : speed;
       movement.normalize().multiplyScalar(moveSpeed * delta);
 

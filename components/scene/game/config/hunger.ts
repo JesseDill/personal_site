@@ -10,4 +10,6 @@ export const hungerConfig = {
   hungerPointsLostPerTrigger: 1,
   /** Max hunger in half-drumstick units (10 full icons). */
   maxHunger: 20,
+  /** Sprint is disabled when remaining hunger (half-units) is at most this value. */
+  sprintHungerCutoff: 6,
 } as const;
