@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
+import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
 import { hotbarSlotCount } from "./game/config/inventory";
 import { spawnCursorImageSrc } from "./game/config/spawnCursor";
@@ -93,8 +94,8 @@ export default function GameScene() {
   const [spawnLookUnlocked, setSpawnLookUnlocked] = useState(false);
   const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
-  const [health] = useState(20);
-  const [maxHealth] = useState(20);
+  const [health, setHealth] = useState(healthConfig.maxHealth);
+  const maxHealth = healthConfig.maxHealth;
   const [hunger, setHunger] = useState(hungerConfig.maxHunger);
   const hungerSaturationRef = useRef(0);
   const [hungerSaturationDisplay, setHungerSaturationDisplay] = useState(0);
@@ -172,6 +173,37 @@ export default function GameScene() {
     () => playerMoving && hungerSaturationDisplay >= hungerConfig.wobbleMinSaturation,
     [playerMoving, hungerSaturationDisplay],
   );
+
+  const [screenShakeActive, setScreenShakeActive] = useState(false);
+  const screenShakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const healthCriticalWobble = health <= healthConfig.criticalHealthThreshold;
+
+  useEffect(() => {
+    if (hunger > 0 || health <= healthConfig.starvationMinHealth) return;
+
+    const interval = setInterval(() => {
+      setHealth((prev) => {
+        const next = Math.max(prev - 1, healthConfig.starvationMinHealth);
+        if (next < prev) {
+          setScreenShakeActive(true);
+          if (screenShakeTimerRef.current) clearTimeout(screenShakeTimerRef.current);
+          screenShakeTimerRef.current = setTimeout(
+            () => setScreenShakeActive(false),
+            healthConfig.screenShakeDurationMs,
+          );
+        }
+        return next;
+      });
+    }, healthConfig.starvationDamageIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [hunger, health]);
+
+  useEffect(() => {
+    return () => {
+      if (screenShakeTimerRef.current) clearTimeout(screenShakeTimerRef.current);
+    };
+  }, []);
 
   const triggerTerrainImpact = useCallback(() => {
     setTerrainImpactTrigger((current) => current + 1);
@@ -405,7 +437,7 @@ export default function GameScene() {
   const content = activePanel ? interactionContent[activePanel] : null;
 
   return (
-    <div className="scene-shell">
+    <div className={`scene-shell${screenShakeActive ? " scene-shell--damage-shake" : ""}`}>
       <Canvas
         camera={{ fov: 70 }}
         shadows
@@ -542,6 +574,7 @@ export default function GameScene() {
         hunger={hunger}
         maxHunger={hungerConfig.maxHunger}
         hungerWobbleActive={hungerWobbleActive}
+        healthCriticalWobble={healthCriticalWobble}
         xpProgress={xpProgress}
         xpLevel={xpLevel}
         onSelectSlot={(index, material) => {

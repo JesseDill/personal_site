@@ -90,6 +90,8 @@ type GameWorldHudProps = {
   maxHunger: number;
   /** True when walking and hunger saturation is high enough for the leftmost active drumstick wobble. */
   hungerWobbleActive: boolean;
+  /** True when health is at or below the critical threshold — all hearts wobble. */
+  healthCriticalWobble: boolean;
   xpProgress: number;
   xpLevel: number;
   onSelectSlot: (index: number, material: DroppedBlockItem["material"] | null) => void;
@@ -115,6 +117,7 @@ export function GameWorldHud({
   hunger,
   maxHunger,
   hungerWobbleActive,
+  healthCriticalWobble,
   xpProgress,
   xpLevel,
   onSelectSlot,
@@ -200,7 +203,9 @@ export function GameWorldHud({
                   alt=""
                   width={18}
                   height={18}
-                  className="mc-status-icon"
+                  className={`mc-status-icon${state === "empty" ? " mc-status-icon--health-depleted" : ""}${
+                    healthCriticalWobble ? " mc-status-icon--wobble" : ""
+                  }`}
                   draggable={false}
                 />
               ))}
