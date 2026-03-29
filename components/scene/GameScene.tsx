@@ -92,6 +92,12 @@ export default function GameScene() {
   const [spawnLookUnlocked, setSpawnLookUnlocked] = useState(false);
   const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
+  const [health] = useState(20);
+  const [maxHealth] = useState(20);
+  const [hunger] = useState(18);
+  const [maxHunger] = useState(20);
+  const [xpLevel] = useState(0);
+  const [xpProgress] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
     dirt: 0,
     wood: 0,
@@ -507,6 +513,12 @@ export default function GameScene() {
         hotbarSlots={hotbarSlots}
         selectedInventorySlot={selectedInventorySlot}
         collectedInventory={collectedInventory}
+        health={health}
+        maxHealth={maxHealth}
+        hunger={hunger}
+        maxHunger={maxHunger}
+        xpProgress={xpProgress}
+        xpLevel={xpLevel}
         onSelectSlot={(index, material) => {
                   setSelectedInventorySlot(index);
                   if (material) setHoveredInventoryMaterial(material);

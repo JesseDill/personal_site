@@ -1,9 +1,40 @@
 "use client";
 
+import Image from "next/image";
 import { hotbarSlotCount } from "../config/inventory";
 import type { DroppedBlockItem } from "../types";
 import { InventoryVoxelIcon } from "./InventoryVoxelIcon";
 import { MinecraftPauseMenu, MinecraftTitleScreen } from "./MinecraftGameMenus";
+
+type HudIconState = "full" | "half" | "empty";
+
+const hudIconTextures = {
+  heart: {
+    full: "/textures/UI/heart-full.svg",
+    half: "/textures/UI/heart-half.svg",
+    empty: "/textures/UI/heart-empty.svg",
+  },
+  hunger: {
+    full: "/textures/UI/hunger-full.svg",
+    half: "/textures/UI/hunger-half.svg",
+    empty: "/textures/UI/hunger-empty.svg",
+  },
+} as const;
+
+function buildHudIconStates(current: number, max: number, slotCount = 10): HudIconState[] {
+  const normalizedMax = Math.max(max, 0);
+  const normalizedCurrent = Math.min(Math.max(current, 0), normalizedMax);
+  const pointsPerIcon = normalizedMax > 0 ? normalizedMax / slotCount : 0;
+
+  return Array.from({ length: slotCount }, (_, index) => {
+    const iconStart = index * pointsPerIcon;
+    const iconEnd = iconStart + pointsPerIcon;
+
+    if (normalizedCurrent >= iconEnd) return "full";
+    if (normalizedCurrent > iconStart) return "half";
+    return "empty";
+  });
+}
 
 type GameWorldHudProps = {
   locked: boolean;
@@ -22,6 +53,12 @@ type GameWorldHudProps = {
   hotbarSlots: (DroppedBlockItem["material"] | null)[];
   selectedInventorySlot: number;
   collectedInventory: Record<DroppedBlockItem["material"], number>;
+  health: number;
+  maxHealth: number;
+  hunger: number;
+  maxHunger: number;
+  xpProgress: number;
+  xpLevel: number;
   onSelectSlot: (index: number, material: DroppedBlockItem["material"] | null) => void;
   onHoverMaterial: (material: DroppedBlockItem["material"]) => void;
   onSlotMouseLeave: (material: DroppedBlockItem["material"]) => void;
@@ -40,6 +77,12 @@ export function GameWorldHud({
   hotbarSlots,
   selectedInventorySlot,
   collectedInventory,
+  health,
+  maxHealth,
+  hunger,
+  maxHunger,
+  xpProgress,
+  xpLevel,
   onSelectSlot,
   onHoverMaterial,
   onSlotMouseLeave,
@@ -51,6 +94,9 @@ export function GameWorldHud({
   const tooltipStyle = crosshairScreenPosition
     ? { left: `${crosshairScreenPosition.x}px`, top: `${crosshairScreenPosition.y + tooltipOffsetY}px` }
     : undefined;
+  const heartStates = buildHudIconStates(health, maxHealth);
+  const hungerStates = buildHudIconStates(hunger, maxHunger);
+  const clampedXpProgress = Math.min(Math.max(xpProgress, 0), 1);
 
   return (
     <div className="hud">
@@ -105,12 +151,47 @@ export function GameWorldHud({
         </div>
       ) : null}
 
-      <section
-        className={`collected-inventory${isPaused ? " collected-inventory--pause-front" : ""}`}
-        aria-label="Collected block inventory"
-        data-ui-layer="true"
-      >
-        <p className="collected-inventory-title">Collected</p>
+      <div className={`mc-hotbar-stack${isPaused ? " collected-inventory--pause-front" : ""}`} data-ui-layer="true">
+        {locked ? (
+          <div className="mc-status-bars" aria-label="Player status">
+            <div className="mc-status-bars-row">
+              <div className="mc-status-icons" aria-label={`Health ${health} out of ${maxHealth}`}>
+                {heartStates.map((state, index) => (
+                  <Image
+                    key={`heart-${index}`}
+                    src={hudIconTextures.heart[state]}
+                    alt=""
+                    width={18}
+                    height={18}
+                    className="mc-status-icon"
+                    draggable={false}
+                  />
+                ))}
+              </div>
+              <div className="mc-status-icons mc-status-icons--hunger" aria-label={`Hunger ${hunger} out of ${maxHunger}`}>
+                {hungerStates.map((state, index) => (
+                  <Image
+                    key={`hunger-${index}`}
+                    src={hudIconTextures.hunger[state]}
+                    alt=""
+                    width={18}
+                    height={18}
+                    className="mc-status-icon"
+                    draggable={false}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mc-xp-wrapper" aria-label={`Experience level ${xpLevel}`}>
+              <div className="mc-xp-level">{xpLevel}</div>
+              <div className="mc-xp-track" aria-hidden="true">
+                <div className="mc-xp-fill" style={{ width: `${clampedXpProgress * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <section className="collected-inventory" aria-label="Collected block inventory">
+          <p className="collected-inventory-title">Collected</p>
         <div className="collected-inventory-grid">
           {Array.from({ length: hotbarSlotCount }, (_, index) => {
             const material = hotbarSlots[index] ?? null;
@@ -142,7 +223,8 @@ export function GameWorldHud({
             );
           })}
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

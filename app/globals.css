@@ -19,6 +19,19 @@
   --hotbar-count-right: 0.18rem;
   --hotbar-count-bottom: 0.14rem;
   --hotbar-selected-lift: -4px;
+  --mc-status-gap: 0.12rem;
+  --mc-status-icon-size: 18px;
+  --mc-status-icon-gap: 0.08rem;
+  --mc-status-row-offset-y: 1.15rem;
+  --mc-xp-height: 0.625rem;
+  --mc-xp-width: 30.8rem;
+  --mc-hotbar-columns: 9;
+  --mc-hotbar-outer-width: calc(
+    var(--hotbar-slot-size) * var(--mc-hotbar-columns)
+    + var(--hotbar-gap) * (var(--mc-hotbar-columns) - 1)
+    + var(--hotbar-padding-x) * 2
+    + 4px
+  );
 
   /*
    * Interaction hover tooltip (`.tooltip` in `GameWorldHud` — label from `InteractionRaycast`).
@@ -328,13 +341,21 @@ a {
   z-index: 2;
 }
 
-.collected-inventory {
+.mc-hotbar-stack {
   position: absolute;
   left: 50%;
   bottom: var(--hotbar-bottom);
   transform: translateX(-50%);
-  width: fit-content;
+  width: var(--mc-hotbar-outer-width);
   z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mc-status-gap);
+}
+
+.collected-inventory {
+  width: fit-content;
   background: rgba(36, 40, 46, 0.44);
   border: 2px solid rgba(154, 161, 173, 0.62);
   box-shadow: 0 4px 0 rgba(16, 18, 22, 0.22);
@@ -344,6 +365,83 @@ a {
 
 .collected-inventory-title {
   display: none;
+}
+
+.mc-status-bars {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.16rem;
+}
+
+.mc-status-bars-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.0rem;
+  transform: translateY(var(--mc-status-row-offset-y));
+}
+
+.mc-status-icons {
+  display: grid;
+  grid-template-columns: repeat(10, var(--mc-status-icon-size));
+  gap: var(--mc-status-icon-gap);
+}
+
+.mc-status-icons--hunger {
+  justify-content: end;
+}
+
+.mc-status-icon {
+  width: var(--mc-status-icon-size) !important;
+  height: auto !important;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
+}
+
+.mc-xp-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.mc-xp-level {
+  min-height: 1rem;
+  color: #8aea55;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 #1f1f1f,
+    1px -1px 0 #1f1f1f,
+    -1px 1px 0 #1f1f1f,
+    1px 1px 0 #1f1f1f;
+}
+
+.mc-xp-track {
+  position: static;
+  width: var(--mc-xp-width);
+  height: var(--mc-xp-height);
+  background-image: url("/textures/UI/xp-bar-bg.svg");
+  background-repeat: repeat-x;
+  background-position: center;
+  background-size: auto auto;
+  overflow: visible;
+}
+
+.mc-xp-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 0;
+  height: 100%;
+  background-image: url("/textures/UI/xp-bar-fill.svg");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 100% 100%;
 }
 
 .collected-inventory-grid {
@@ -781,6 +879,12 @@ a {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --mc-status-icon-size: 16px;
+    --mc-status-icon-gap: 0.05rem;
+    --mc-hotbar-columns: 5;
+  }
+
   .scene-shell {
     height: 72vh;
   }
@@ -803,6 +907,10 @@ a {
 
   .collected-inventory-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mc-status-bars-row {
+    gap: 0.6rem;
   }
 
   .panel {
