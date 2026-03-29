@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
+import { hungerConfig } from "./game/config/hunger";
 import { hotbarSlotCount } from "./game/config/inventory";
 import { spawnCursorImageSrc } from "./game/config/spawnCursor";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
@@ -94,8 +95,9 @@ export default function GameScene() {
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [health] = useState(20);
   const [maxHealth] = useState(20);
-  const [hunger] = useState(18);
-  const [maxHunger] = useState(20);
+  const [hunger, setHunger] = useState(hungerConfig.maxHunger);
+  const hungerSaturationRef = useRef(0);
+  const [hungerSaturationDisplay, setHungerSaturationDisplay] = useState(0);
   const [xpLevel] = useState(0);
   const [xpProgress] = useState(0);
   const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
@@ -154,6 +156,22 @@ export default function GameScene() {
     setTargetLabel(label);
     setTargetHref(href);
   }, []);
+
+  const handleDistanceWalked = useCallback((distance: number) => {
+    hungerSaturationRef.current += distance * hungerConfig.saturationPerBlock;
+    if (hungerSaturationRef.current >= hungerConfig.saturationThreshold) {
+      hungerSaturationRef.current = 0;
+      setHunger((prev) => Math.max(prev - hungerConfig.hungerPointsLostPerTrigger, 0));
+      setHungerSaturationDisplay(0);
+    } else {
+      setHungerSaturationDisplay(hungerSaturationRef.current);
+    }
+  }, []);
+
+  const hungerWobbleActive = useMemo(
+    () => playerMoving && hungerSaturationDisplay >= hungerConfig.wobbleMinSaturation,
+    [playerMoving, hungerSaturationDisplay],
+  );
 
   const triggerTerrainImpact = useCallback(() => {
     setTerrainImpactTrigger((current) => current + 1);
@@ -491,7 +509,12 @@ export default function GameScene() {
           </Hud>
         ) : null}
 
-        <PlayerController enabled={locked} onMovingChange={setPlayerMoving} getOccupancySnapshot={getOccupancySnapshot} />
+        <PlayerController
+          enabled={locked}
+          onMovingChange={setPlayerMoving}
+          onDistanceWalked={handleDistanceWalked}
+          getOccupancySnapshot={getOccupancySnapshot}
+        />
         <InteractionRaycast onTarget={onTarget} pointerNdc={interactionPointerNdc} />
         <ScenePointerLockControls
           onLock={handlePointerLockGained}
@@ -516,7 +539,8 @@ export default function GameScene() {
         health={health}
         maxHealth={maxHealth}
         hunger={hunger}
-        maxHunger={maxHunger}
+        maxHunger={hungerConfig.maxHunger}
+        hungerWobbleActive={hungerWobbleActive}
         xpProgress={xpProgress}
         xpLevel={xpLevel}
         onSelectSlot={(index, material) => {

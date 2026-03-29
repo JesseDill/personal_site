@@ -15,10 +15,13 @@ import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
 export function PlayerController({
   enabled,
   onMovingChange,
+  onDistanceWalked,
   getOccupancySnapshot,
 }: {
   enabled: boolean;
   onMovingChange: (moving: boolean) => void;
+  /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
+  onDistanceWalked?: (distance: number) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
 }) {
   const { camera } = useThree();
@@ -30,6 +33,8 @@ export function PlayerController({
   const jumpVelocity = 7.1;
   const gravity = 22;
   const wasEnabledRef = useRef(enabled);
+  const onDistanceWalkedRef = useRef(onDistanceWalked);
+  onDistanceWalkedRef.current = onDistanceWalked;
 
   useEffect(() => {
     camera.position.set(...playerSpawnPosition);
@@ -175,6 +180,15 @@ export function PlayerController({
           groundedRef.current = false;
         }
       }
+    }
+
+    const prevX = camera.position.x;
+    const prevZ = camera.position.z;
+    const dx = nextX - prevX;
+    const dz = nextZ - prevZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist > 0.001) {
+      onDistanceWalkedRef.current?.(dist);
     }
 
     camera.position.set(nextX, nextFeetY + playerCollisionConfig.eyeHeight, nextZ);

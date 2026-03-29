@@ -21,6 +21,37 @@ const hudIconTextures = {
   },
 } as const;
 
+/** Leftmost drumstick that still has food (full or half); wobble target. */
+function findLeftmostActiveHungerIndex(states: HudIconState[]): number {
+  for (let i = 0; i < states.length; i++) {
+    if (states[i] !== "empty") return i;
+  }
+  return -1;
+}
+
+/**
+ * Hunger depletes left to right: the first icons empty as points are lost from `max` down to `current`.
+ * `current` / `max` are half-drumstick units (e.g. 20 / 20 = 10 full icons).
+ */
+function buildHungerIconStatesLeftDeplete(current: number, max: number, slotCount = 10): HudIconState[] {
+  const normalizedMax = Math.max(max, 0);
+  const normalizedCurrent = Math.min(Math.max(current, 0), normalizedMax);
+  if (normalizedMax <= 0 || slotCount <= 0) {
+    return Array.from({ length: slotCount }, () => "empty" as HudIconState);
+  }
+
+  const halfPointsPerIcon = normalizedMax / slotCount;
+  const depletedHalfPoints = normalizedMax - normalizedCurrent;
+
+  return Array.from({ length: slotCount }, (_, index) => {
+    const iconLeftEdge = index * halfPointsPerIcon;
+    const consumedHere = Math.max(0, depletedHalfPoints - iconLeftEdge);
+    if (consumedHere >= halfPointsPerIcon) return "empty";
+    if (consumedHere > 0) return "half";
+    return "full";
+  });
+}
+
 function buildHudIconStates(current: number, max: number, slotCount = 10): HudIconState[] {
   const normalizedMax = Math.max(max, 0);
   const normalizedCurrent = Math.min(Math.max(current, 0), normalizedMax);
@@ -57,6 +88,8 @@ type GameWorldHudProps = {
   maxHealth: number;
   hunger: number;
   maxHunger: number;
+  /** True when walking and hunger saturation is high enough for the leftmost active drumstick wobble. */
+  hungerWobbleActive: boolean;
   xpProgress: number;
   xpLevel: number;
   onSelectSlot: (index: number, material: DroppedBlockItem["material"] | null) => void;
@@ -81,6 +114,7 @@ export function GameWorldHud({
   maxHealth,
   hunger,
   maxHunger,
+  hungerWobbleActive,
   xpProgress,
   xpLevel,
   onSelectSlot,
@@ -95,7 +129,8 @@ export function GameWorldHud({
     ? { left: `${crosshairScreenPosition.x}px`, top: `${crosshairScreenPosition.y + tooltipOffsetY}px` }
     : undefined;
   const heartStates = buildHudIconStates(health, maxHealth);
-  const hungerStates = buildHudIconStates(hunger, maxHunger);
+  const hungerStates = buildHungerIconStatesLeftDeplete(hunger, maxHunger);
+  const leftmostActiveHungerIndex = findLeftmostActiveHungerIndex(hungerStates);
   const clampedXpProgress = Math.min(Math.max(xpProgress, 0), 1);
 
   return (
@@ -178,7 +213,9 @@ export function GameWorldHud({
                   alt=""
                   width={18}
                   height={18}
-                  className="mc-status-icon"
+                  className={`mc-status-icon${state === "empty" ? " mc-status-icon--hunger-depleted" : ""}${
+                    hungerWobbleActive && index === leftmostActiveHungerIndex ? " mc-status-icon--wobble" : ""
+                  }`}
                   draggable={false}
                 />
               ))}

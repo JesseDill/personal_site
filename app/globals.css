@@ -401,6 +401,30 @@ a {
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
 }
 
+.mc-status-icon.mc-status-icon--hunger-depleted {
+  filter: grayscale(1) brightness(0.7) contrast(0.92) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+@keyframes mc-hunger-wobble {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  25% {
+    transform: translateY(-1.5px) rotate(-4deg);
+  }
+
+  75% {
+    transform: translateY(1px) rotate(3deg);
+  }
+}
+
+.mc-status-icon--wobble {
+  display: inline-block;
+  animation: mc-hunger-wobble 0.45s ease-in-out infinite;
+}
+
 .mc-xp-wrapper {
   width: 100%;
   display: flex;
