@@ -3,7 +3,12 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { playerCollisionConfig, playerSpawnPosition, playerSpawnRotation } from "../config/player";
+import {
+  playerCollisionConfig,
+  playerSpawnPosition,
+  playerSpawnRotation,
+  playerSprintMultiplier,
+} from "../config/player";
 import {
   canPlayerOccupyFeetPosition,
   findStepUpFeetHeight,
@@ -79,6 +84,8 @@ export function PlayerController({
     keysRef.current.KeyS = false;
     keysRef.current.KeyA = false;
     keysRef.current.KeyD = false;
+    keysRef.current.ShiftLeft = false;
+    keysRef.current.ShiftRight = false;
   }, [enabled, onMovingChange]);
 
   useFrame((_state, delta) => {
@@ -110,7 +117,10 @@ export function PlayerController({
     let nextFeetY = currentFeetY;
 
     if (wantsToMove) {
-      movement.normalize().multiplyScalar(speed * delta);
+      const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
+      const forwardSprint = sprintHeld && keysRef.current.KeyW;
+      const moveSpeed = forwardSprint ? speed * playerSprintMultiplier : speed;
+      movement.normalize().multiplyScalar(moveSpeed * delta);
 
       const candidateX = camera.position.x + movement.x;
       const candidateZ = camera.position.z + movement.z;

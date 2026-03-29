@@ -1,5 +1,8 @@
 import { landmarks } from "@/data/world";
 
+/** Walk speed multiplier when holding Shift while moving forward (W). */
+export const playerSprintMultiplier = 1.3;
+
 export const playerCollisionConfig = {
   radius: 0.34,
   height: 1.8,
