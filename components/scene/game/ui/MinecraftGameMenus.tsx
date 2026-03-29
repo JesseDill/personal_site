@@ -47,6 +47,31 @@ export function MinecraftTitleScreen({ activePanel, onRequestPointerLock }: Mine
   );
 }
 
+type MinecraftDeathScreenProps = {
+  onRespawn: () => void;
+  onReturnToTitle: () => void;
+};
+
+/** Health reached 0 — red-tinted overlay with respawn / title actions. */
+export function MinecraftDeathScreen({ onRespawn, onReturnToTitle }: MinecraftDeathScreenProps) {
+  return (
+    <>
+      <div className="mc-death-dim" aria-hidden="true" />
+      <div className="mc-menu-root mc-menu-root--death" data-ui-layer="true" role="dialog" aria-modal="true" aria-label="You died">
+        <h2 className="mc-menu-heading mc-menu-heading--death">You died!</h2>
+        <div className="mc-menu-column">
+          <button type="button" className="mc-stone-button mc-stone-button--wide" onClick={onRespawn}>
+            Respawn
+          </button>
+          <button type="button" className="mc-stone-button mc-stone-button--wide" onClick={onReturnToTitle}>
+            Title screen
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 type MinecraftPauseMenuProps = {
   activePanel: boolean;
   onQuitToTitle: () => void;

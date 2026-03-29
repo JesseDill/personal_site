@@ -4,7 +4,7 @@ import Image from "next/image";
 import { hotbarSlotCount } from "../config/inventory";
 import type { DroppedBlockItem } from "../types";
 import { InventoryVoxelIcon } from "./InventoryVoxelIcon";
-import { MinecraftPauseMenu, MinecraftTitleScreen } from "./MinecraftGameMenus";
+import { MinecraftDeathScreen, MinecraftPauseMenu, MinecraftTitleScreen } from "./MinecraftGameMenus";
 
 type HudIconState = "full" | "half" | "empty";
 
@@ -69,11 +69,15 @@ function buildHudIconStates(current: number, max: number, slotCount = 10): HudIc
 
 type GameWorldHudProps = {
   locked: boolean;
+  /** True when health is depleted — death overlay takes priority over pause/title. */
+  isDead: boolean;
   /** True after the player has entered the world at least once this session and is now unlocked (Esc). */
   isPaused: boolean;
   onQuitToTitle: () => void;
   /** Same user gesture as Enter / Back — must call `canvas.requestPointerLock()` (Drei’s selector wiring can miss the HUD). */
   onRequestPointerLock: () => void;
+  onRespawn: () => void;
+  onDeathReturnToTitle: () => void;
   activePanel: boolean;
   targetLabel: string | null;
   crosshairScreenPosition?: { x: number; y: number } | null;
@@ -101,9 +105,12 @@ type GameWorldHudProps = {
 
 export function GameWorldHud({
   locked,
+  isDead,
   isPaused,
   onQuitToTitle,
   onRequestPointerLock,
+  onRespawn,
+  onDeathReturnToTitle,
   activePanel,
   targetLabel,
   crosshairScreenPosition,
@@ -138,10 +145,11 @@ export function GameWorldHud({
 
   return (
     <div className="hud">
-      {!locked && !isPaused ? (
+      {!locked && isDead ? <MinecraftDeathScreen onRespawn={onRespawn} onReturnToTitle={onDeathReturnToTitle} /> : null}
+      {!locked && !isDead && !isPaused ? (
         <MinecraftTitleScreen activePanel={activePanel} onRequestPointerLock={onRequestPointerLock} />
       ) : null}
-      {!locked && isPaused ? (
+      {!locked && !isDead && isPaused ? (
         <MinecraftPauseMenu
           activePanel={activePanel}
           onQuitToTitle={onQuitToTitle}
@@ -190,7 +198,9 @@ export function GameWorldHud({
       ) : null}
 
       <div
-        className={`mc-hotbar-stack${!locked ? " collected-inventory--pause-front" : ""}`}
+        className={`mc-hotbar-stack${!locked && isDead ? " mc-hotbar-stack--death" : ""}${
+          !locked && !isDead ? " collected-inventory--pause-front" : ""
+        }`}
         data-ui-layer="true"
       >
         <div className="mc-status-bars" aria-label="Player status">

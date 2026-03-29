@@ -19,6 +19,7 @@ import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
 
 export function PlayerController({
   enabled,
+  respawnToken = 0,
   onMovingChange,
   onDistanceWalked,
   onFallLand,
@@ -26,6 +27,8 @@ export function PlayerController({
   sprintAllowed = true,
 }: {
   enabled: boolean;
+  /** Increment from parent to snap the player back to spawn (position, rotation, motion). */
+  respawnToken?: number;
   onMovingChange: (moving: boolean) => void;
   /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
   onDistanceWalked?: (distance: number) => void;
@@ -58,7 +61,15 @@ export function PlayerController({
     groundedRef.current = true;
     jumpQueuedRef.current = false;
     airbornePeakFeetRef.current = null;
-  }, [camera]);
+    movingRef.current = false;
+    onMovingChange(false);
+    keysRef.current.KeyW = false;
+    keysRef.current.KeyS = false;
+    keysRef.current.KeyA = false;
+    keysRef.current.KeyD = false;
+    keysRef.current.ShiftLeft = false;
+    keysRef.current.ShiftRight = false;
+  }, [camera, onMovingChange, respawnToken]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -94,6 +94,7 @@ export default function GameScene() {
   const [spawnLookUnlocked, setSpawnLookUnlocked] = useState(false);
   const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
+  const [respawnToken, setRespawnToken] = useState(0);
   const [health, setHealth] = useState(healthConfig.maxHealth);
   const maxHealth = healthConfig.maxHealth;
   const [hunger, setHunger] = useState(hungerConfig.maxHunger);
@@ -122,9 +123,14 @@ export default function GameScene() {
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const worldCanvasElRef = useRef<HTMLCanvasElement | null>(null);
 
-  const requestWorldPointerLock = useCallback(() => {
+  const requestWorldPointerLockRaw = useCallback(() => {
     worldCanvasElRef.current?.requestPointerLock();
   }, []);
+
+  const requestWorldPointerLock = useCallback(() => {
+    if (health <= 0) return;
+    requestWorldPointerLockRaw();
+  }, [health, requestWorldPointerLockRaw]);
   const getCanvasRect = useCallback(() => {
     return worldCanvasElRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
   }, []);
@@ -186,6 +192,35 @@ export default function GameScene() {
       healthConfig.screenShakeDurationMs,
     );
   }, []);
+
+  const resetVitals = useCallback(() => {
+    setHealth(healthConfig.maxHealth);
+    setHunger(hungerConfig.maxHunger);
+    hungerSaturationRef.current = 0;
+    setHungerSaturationDisplay(0);
+  }, []);
+
+  const handleRespawn = useCallback(() => {
+    resetVitals();
+    setRespawnToken((t) => t + 1);
+    requestWorldPointerLockRaw();
+  }, [resetVitals, requestWorldPointerLockRaw]);
+
+  const handleDeathReturnToTitle = useCallback(() => {
+    resetVitals();
+    setRespawnToken((t) => t + 1);
+    setHasEnteredWorldThisSession(false);
+  }, [resetVitals]);
+
+  useEffect(() => {
+    if (health !== 0) return;
+    document.exitPointerLock();
+    setScreenShakeActive(false);
+    if (screenShakeTimerRef.current) {
+      clearTimeout(screenShakeTimerRef.current);
+      screenShakeTimerRef.current = null;
+    }
+  }, [health]);
 
   const handleFallLand = useCallback(
     (fallDistance: number) => {
@@ -562,6 +597,7 @@ export default function GameScene() {
 
         <PlayerController
           enabled={locked}
+          respawnToken={respawnToken}
           onMovingChange={setPlayerMoving}
           onDistanceWalked={handleDistanceWalked}
           onFallLand={handleFallLand}
@@ -578,9 +614,12 @@ export default function GameScene() {
 
       <GameWorldHud
         locked={locked}
+        isDead={health <= 0}
         isPaused={!locked && hasEnteredWorldThisSession}
         onQuitToTitle={() => setHasEnteredWorldThisSession(false)}
         onRequestPointerLock={requestWorldPointerLock}
+        onRespawn={handleRespawn}
+        onDeathReturnToTitle={handleDeathReturnToTitle}
         activePanel={Boolean(activePanel)}
         targetLabel={targetLabel}
         crosshairScreenPosition={locked ? spawnCursorScreenPosition : null}
