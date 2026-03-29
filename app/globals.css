@@ -1082,7 +1082,8 @@ a {
   min-width: 0;
 }
 
-.collected-inventory--pause-front {
+.mc-hotbar-stack.collected-inventory--pause-front {
   z-index: 7;
-  filter: brightness(0.92);
+  filter: brightness(0.78) grayscale(0.2) saturate(0.85);
+  opacity: 0.92;
 }

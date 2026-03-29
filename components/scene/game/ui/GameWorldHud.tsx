@@ -151,45 +151,46 @@ export function GameWorldHud({
         </div>
       ) : null}
 
-      <div className={`mc-hotbar-stack${isPaused ? " collected-inventory--pause-front" : ""}`} data-ui-layer="true">
-        {locked ? (
-          <div className="mc-status-bars" aria-label="Player status">
-            <div className="mc-status-bars-row">
-              <div className="mc-status-icons" aria-label={`Health ${health} out of ${maxHealth}`}>
-                {heartStates.map((state, index) => (
-                  <Image
-                    key={`heart-${index}`}
-                    src={hudIconTextures.heart[state]}
-                    alt=""
-                    width={18}
-                    height={18}
-                    className="mc-status-icon"
-                    draggable={false}
-                  />
-                ))}
-              </div>
-              <div className="mc-status-icons mc-status-icons--hunger" aria-label={`Hunger ${hunger} out of ${maxHunger}`}>
-                {hungerStates.map((state, index) => (
-                  <Image
-                    key={`hunger-${index}`}
-                    src={hudIconTextures.hunger[state]}
-                    alt=""
-                    width={18}
-                    height={18}
-                    className="mc-status-icon"
-                    draggable={false}
-                  />
-                ))}
-              </div>
+      <div
+        className={`mc-hotbar-stack${!locked ? " collected-inventory--pause-front" : ""}`}
+        data-ui-layer="true"
+      >
+        <div className="mc-status-bars" aria-label="Player status">
+          <div className="mc-status-bars-row">
+            <div className="mc-status-icons" aria-label={`Health ${health} out of ${maxHealth}`}>
+              {heartStates.map((state, index) => (
+                <Image
+                  key={`heart-${index}`}
+                  src={hudIconTextures.heart[state]}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="mc-status-icon"
+                  draggable={false}
+                />
+              ))}
             </div>
-            <div className="mc-xp-wrapper" aria-label={`Experience level ${xpLevel}`}>
-              <div className="mc-xp-level">{xpLevel}</div>
-              <div className="mc-xp-track" aria-hidden="true">
-                <div className="mc-xp-fill" style={{ width: `${clampedXpProgress * 100}%` }} />
-              </div>
+            <div className="mc-status-icons mc-status-icons--hunger" aria-label={`Hunger ${hunger} out of ${maxHunger}`}>
+              {hungerStates.map((state, index) => (
+                <Image
+                  key={`hunger-${index}`}
+                  src={hudIconTextures.hunger[state]}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="mc-status-icon"
+                  draggable={false}
+                />
+              ))}
             </div>
           </div>
-        ) : null}
+          <div className="mc-xp-wrapper" aria-label={`Experience level ${xpLevel}`}>
+            <div className="mc-xp-level">{xpLevel}</div>
+            <div className="mc-xp-track" aria-hidden="true">
+              <div className="mc-xp-fill" style={{ width: `${clampedXpProgress * 100}%` }} />
+            </div>
+          </div>
+        </div>
         <section className="collected-inventory" aria-label="Collected block inventory">
           <p className="collected-inventory-title">Collected</p>
         <div className="collected-inventory-grid">
