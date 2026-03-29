@@ -39,6 +39,8 @@ export function PlayerController({
   enabled,
   respawnToken = 0,
   onMovingChange,
+  onSprintingChange,
+  onSneakingChange,
   onDistanceWalked,
   onFallLand,
   getOccupancySnapshot,
@@ -48,6 +50,10 @@ export function PlayerController({
   /** Increment from parent to snap the player back to spawn (position, rotation, motion). */
   respawnToken?: number;
   onMovingChange: (moving: boolean) => void;
+  /** Sprinting (Shift+W while moving, not sneaking); for viewmodel bobbing, etc. */
+  onSprintingChange?: (sprinting: boolean) => void;
+  /** Grounded sneak (Ctrl); for viewmodel bobbing, etc. */
+  onSneakingChange?: (sneaking: boolean) => void;
   /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
   onDistanceWalked?: (distance: number) => void;
   /** Vertical drop in blocks from peak feet height while airborne to landing feet Y. */
@@ -72,6 +78,12 @@ export function PlayerController({
   /** Highest feet Y reached during current airborne segment; cleared on ground. */
   const airbornePeakFeetRef = useRef<number | null>(null);
   const sneakingRef = useRef(false);
+  const reportedSprintingRef = useRef(false);
+  const reportedSneakingRef = useRef(false);
+  const onSprintingChangeRef = useRef(onSprintingChange);
+  onSprintingChangeRef.current = onSprintingChange;
+  const onSneakingChangeRef = useRef(onSneakingChange);
+  onSneakingChangeRef.current = onSneakingChange;
 
   useEffect(() => {
     camera.position.set(...playerSpawnPosition);
@@ -91,6 +103,10 @@ export function PlayerController({
     keysRef.current.ControlLeft = false;
     keysRef.current.ControlRight = false;
     sneakingRef.current = false;
+    reportedSprintingRef.current = false;
+    reportedSneakingRef.current = false;
+    onSprintingChangeRef.current?.(false);
+    onSneakingChangeRef.current?.(false);
   }, [camera, onMovingChange, respawnToken]);
 
   useEffect(() => {
@@ -133,6 +149,10 @@ export function PlayerController({
     keysRef.current.ControlLeft = false;
     keysRef.current.ControlRight = false;
     sneakingRef.current = false;
+    reportedSprintingRef.current = false;
+    reportedSneakingRef.current = false;
+    onSprintingChangeRef.current?.(false);
+    onSneakingChangeRef.current?.(false);
     airbornePeakFeetRef.current = null;
   }, [enabled, onMovingChange]);
 
@@ -163,6 +183,9 @@ export function PlayerController({
     const ctrlHeld = Boolean(keysRef.current.ControlLeft || keysRef.current.ControlRight);
     const shiftHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
     const sneaking = ctrlHeld && !(shiftHeld && wantsToMove) && groundedRef.current;
+    const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
+    const forwardSprint = sprintAllowed && sprintHeld && keysRef.current.KeyW;
+    const isSprinting = Boolean(wantsToMove && !sneaking && forwardSprint);
 
     if (movingRef.current !== wantsToMove) {
       movingRef.current = wantsToMove;
@@ -181,8 +204,6 @@ export function PlayerController({
     let nextFeetY = currentFeetY;
 
     if (wantsToMove) {
-      const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
-      const forwardSprint = sprintAllowed && sprintHeld && keysRef.current.KeyW;
       let moveSpeed = speed;
       if (sneaking) {
         const diagonal =
@@ -338,6 +359,15 @@ export function PlayerController({
 
     camera.position.set(nextX, nextFeetY + activeEyeHeight, nextZ);
     sneakingRef.current = sneaking;
+
+    if (sneaking !== reportedSneakingRef.current) {
+      reportedSneakingRef.current = sneaking;
+      onSneakingChangeRef.current?.(sneaking);
+    }
+    if (isSprinting !== reportedSprintingRef.current) {
+      reportedSprintingRef.current = isSprinting;
+      onSprintingChangeRef.current?.(isSprinting);
+    }
   });
 
   return null;

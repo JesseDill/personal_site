@@ -84,6 +84,8 @@ export default function GameScene() {
   const [activePanel, setActivePanel] = useState<InteractionId | null>(null);
   const [locked, setLocked] = useState(false);
   const [playerMoving, setPlayerMoving] = useState(false);
+  const [playerSprinting, setPlayerSprinting] = useState(false);
+  const [playerSneaking, setPlayerSneaking] = useState(false);
   const [armSwingTick, setArmSwingTick] = useState(0);
   const [placeSwingTick, setPlaceSwingTick] = useState(0);
   const [armSwingHeld, setArmSwingHeld] = useState(false);
@@ -586,6 +588,8 @@ export default function GameScene() {
             <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={48} />
             <PlayerArmViewmodel
               moving={playerMoving}
+              sprinting={playerSprinting}
+              sneaking={playerSneaking}
               swingTick={armSwingTick}
               placeSwingTick={placeSwingTick}
               swingHeld={armSwingHeld}
@@ -599,6 +603,8 @@ export default function GameScene() {
           enabled={locked}
           respawnToken={respawnToken}
           onMovingChange={setPlayerMoving}
+          onSprintingChange={setPlayerSprinting}
+          onSneakingChange={setPlayerSneaking}
           onDistanceWalked={handleDistanceWalked}
           onFallLand={handleFallLand}
           getOccupancySnapshot={getOccupancySnapshot}

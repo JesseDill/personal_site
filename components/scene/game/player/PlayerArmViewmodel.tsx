@@ -10,6 +10,8 @@ import type { DroppedBlockItem } from "../types";
 
 export function PlayerArmViewmodel({
   moving,
+  sprinting,
+  sneaking,
   swingTick,
   placeSwingTick,
   swingHeld,
@@ -17,6 +19,8 @@ export function PlayerArmViewmodel({
   heldInventoryMaterial,
 }: {
   moving: boolean;
+  sprinting: boolean;
+  sneaking: boolean;
   swingTick: number;
   placeSwingTick: number;
   swingHeld: boolean;
@@ -52,8 +56,10 @@ export function PlayerArmViewmodel({
   useFrame((_state, delta) => {
     if (!armRef.current) return;
 
-    bobBlendRef.current = THREE.MathUtils.damp(bobBlendRef.current, moving ? 1 : 0, 8, delta);
-    bobPhaseRef.current += delta * THREE.MathUtils.lerp(1.3, 10.5, bobBlendRef.current);
+    const bobTarget = sneaking ? 0 : moving ? 1 : 0;
+    bobBlendRef.current = THREE.MathUtils.damp(bobBlendRef.current, bobTarget, 8, delta);
+    const maxBobSpeed = sprinting ? 13.5 : 10.5;
+    bobPhaseRef.current += delta * THREE.MathUtils.lerp(1.3, maxBobSpeed, bobBlendRef.current);
     swingProgressRef.current += delta / swing_duration;
 
     if (swingProgressRef.current >= 1) {
