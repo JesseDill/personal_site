@@ -163,6 +163,8 @@ export default function GameScene() {
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const worldCanvasElRef = useRef<HTMLCanvasElement | null>(null);
   const worldDropOriginRef = useRef<WorldDropOrigin | null>(null);
+  const inventoryResumePointerLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [suppressMenuOverlaysForInventoryResume, setSuppressMenuOverlaysForInventoryResume] = useState(false);
 
   const requestWorldPointerLockRaw = useCallback(() => {
     worldCanvasElRef.current?.requestPointerLock();
@@ -182,6 +184,11 @@ export default function GameScene() {
   const hemisphereLightRef = useRef<THREE.HemisphereLight>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight>(null);
   const handlePointerLockGained = useCallback(() => {
+    if (inventoryResumePointerLockTimeoutRef.current) {
+      clearTimeout(inventoryResumePointerLockTimeoutRef.current);
+      inventoryResumePointerLockTimeoutRef.current = null;
+    }
+    setSuppressMenuOverlaysForInventoryResume(false);
     setLocked(true);
     setHasEnteredWorldThisSession(true);
     if (!spawnLookUnlocked) {
@@ -373,6 +380,14 @@ export default function GameScene() {
   const closeInventory = useCallback(() => {
     dropCursorStackIfAny();
     setInventoryOpen(false);
+    setSuppressMenuOverlaysForInventoryResume(true);
+    if (inventoryResumePointerLockTimeoutRef.current) {
+      clearTimeout(inventoryResumePointerLockTimeoutRef.current);
+    }
+    inventoryResumePointerLockTimeoutRef.current = setTimeout(() => {
+      inventoryResumePointerLockTimeoutRef.current = null;
+      setSuppressMenuOverlaysForInventoryResume(false);
+    }, 750);
     requestWorldPointerLock();
   }, [dropCursorStackIfAny, requestWorldPointerLock]);
 
@@ -420,6 +435,11 @@ export default function GameScene() {
     if (health !== 0) return;
     document.exitPointerLock();
     setInventoryOpen(false);
+    setSuppressMenuOverlaysForInventoryResume(false);
+    if (inventoryResumePointerLockTimeoutRef.current) {
+      clearTimeout(inventoryResumePointerLockTimeoutRef.current);
+      inventoryResumePointerLockTimeoutRef.current = null;
+    }
     const c = cursorItemRef.current;
     if (c) {
       spawnDroppedItemsFromStack(c);
@@ -742,6 +762,7 @@ export default function GameScene() {
         locked={locked}
         isDead={health <= 0}
         isPaused={!locked && hasEnteredWorldThisSession}
+        suppressMenuOverlaysForInventoryResume={suppressMenuOverlaysForInventoryResume}
         onQuitToTitle={() => setHasEnteredWorldThisSession(false)}
         onRequestPointerLock={requestWorldPointerLock}
         onRespawn={handleRespawn}

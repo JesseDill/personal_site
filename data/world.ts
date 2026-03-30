@@ -156,12 +156,8 @@ type TerrainZone = {
   maxZ: number;
 };
 
-/** Flat ground for spawn pocket, main plains village, and connecting spine (billboard stays at z=7). */
-const flatTerrainZones: TerrainZone[] = [
-  { minX: -6, maxX: 6, minZ: -9, maxZ: 8 },
-  { minX: -13, maxX: 13, minZ: -25, maxZ: -7 },
-  { minX: -4, maxX: 4, minZ: -25, maxZ: 6 },
-];
+/** Flat ground for spawn / billboard pocket only (billboard at z = 7). */
+const flatTerrainZones: TerrainZone[] = [{ minX: -6, maxX: 6, minZ: -9, maxZ: 8 }];
 
 function isInsideZone(x: number, z: number, zone: TerrainZone) {
   return x >= zone.minX && x <= zone.maxX && z >= zone.minZ && z <= zone.maxZ;
@@ -241,24 +237,85 @@ function addColumn(
   }
 }
 
+/** Deterministic 32-bit mix for stable tree variation from world (x, z). */
+function treeSeed2d(x: number, z: number) {
+  let h = x * 374761393 + z * 668265263;
+  h = (h ^ (h >>> 13)) * 1274126177;
+  return h >>> 0;
+}
+
+function isBlockXZInWorldBounds(px: number, pz: number) {
+  return px >= worldBounds.minX && px <= worldBounds.maxX && pz >= worldBounds.minZ && pz <= worldBounds.maxZ;
+}
+
+/** Horizontal radius per canopy layer: bell shape, ~5–7 blocks wide at the widest slice. */
+function canopyLayerRadius(layerIndex: number, layerCount: number) {
+  const mid = (layerCount - 1) / 2;
+  const dist = Math.abs(layerIndex - mid);
+  if (dist <= 0.5) return 3;
+  if (dist <= 1.5) return 2;
+  return 1;
+}
+
+/** Filled disk of leaf voxels at y, connected vertically through the trunk column above. */
+function addTreeCanopyDisk(
+  blocks: WorldBlock[],
+  trunkX: number,
+  trunkZ: number,
+  y: number,
+  radius: number,
+  omitCenter: boolean,
+) {
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    for (let dz = -radius; dz <= radius; dz += 1) {
+      if (omitCenter && dx === 0 && dz === 0) continue;
+      if (dx * dx + dz * dz > radius * radius) continue;
+      const px = trunkX + dx;
+      const pz = trunkZ + dz;
+      if (!isBlockXZInWorldBounds(px, pz)) continue;
+      blocks.push({ position: [px, y, pz], material: "leaves", solid: true });
+    }
+  }
+}
+
+/**
+ * Plains-style oak-ish tree: variable trunk height, optional single branch, layered spherical canopy.
+ * Leaves are generated from stacked disks so every leaf has a path of face-adjacent blocks to the trunk.
+ */
 function addTree(blocks: WorldBlock[], x: number, z: number) {
-  addColumn(blocks, x, z, 3, 0.5, "wood");
+  if (!isBlockXZInWorldBounds(x, z)) return;
 
-  const leafOffsets = [
-    [-1, 2.5, 0],
-    [1, 2.5, 0],
-    [0, 2.5, -1],
-    [0, 2.5, 1],
-    [0, 3.5, 0],
-    [-1, 3.5, -1],
-    [1, 3.5, -1],
-    [-1, 3.5, 1],
-    [1, 3.5, 1],
-  ] as const;
+  const seed = treeSeed2d(x, z);
+  const trunkHeight = 4 + (seed % 3);
+  const fancyOak = (seed >>> 8) % 4 === 0;
+  const layerCount = 4 + (fancyOak ? 2 : 0);
 
-  leafOffsets.forEach(([offsetX, y, offsetZ]) => {
-    blocks.push({ position: [x + offsetX, y, z + offsetZ], material: "leaves", solid: true });
-  });
+  addColumn(blocks, x, z, trunkHeight, 0.5, "wood");
+  const trunkTopY = 0.5 + (trunkHeight - 1);
+
+  if ((seed >>> 4) % 3 === 0) {
+    const dir = (seed >>> 6) % 4;
+    const bx = x + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
+    const bz = z + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
+    if (isBlockXZInWorldBounds(bx, bz)) {
+      blocks.push({ position: [bx, trunkTopY, bz], material: "wood", solid: true });
+    }
+  }
+
+  // Leaves start at the top log (ring only on that layer) so the crown sits lower.
+  for (let layer = 0; layer < layerCount; layer += 1) {
+    const y = trunkTopY + layer;
+    const r = canopyLayerRadius(layer, layerCount);
+    addTreeCanopyDisk(blocks, x, z, y, r, layer === 0);
+  }
+
+  const topLeafY = trunkTopY + (layerCount - 1);
+  const logBelowTopLeaf = 1 + ((seed >>> 10) % 2);
+  for (let k = 1; k <= logBelowTopLeaf; k += 1) {
+    const wy = topLeafY - k;
+    if (wy < 0.5) continue;
+    blocks.push({ position: [x, wy, z], material: "wood", solid: true });
+  }
 }
 
 function addCloud(blocks: WorldBlock[], x: number, z: number) {
@@ -311,71 +368,6 @@ function addSpawnBillboard(blocks: WorldBlock[]) {
   // blocks.push({ position: [3, 4.5, 7], material: "stoneDark", solid: true });
 }
 
-type DoorEdge = "north" | "south" | "east" | "west";
-
-/** Simple oak-and-cobble style house with a flat plank roof; door is a 1-block gap on the chosen edge. */
-function addVillageHouse(
-  blocks: WorldBlock[],
-  minX: number,
-  maxX: number,
-  minZ: number,
-  maxZ: number,
-  doorEdge: DoorEdge,
-) {
-  addRect(blocks, minX, maxX, minZ, maxZ, 0.5, "stone", true);
-
-  const doorX = Math.round((minX + maxX) / 2);
-  const doorZ = Math.round((minZ + maxZ) / 2);
-
-  for (const y of [1.5, 2.5]) {
-    for (let x = minX; x <= maxX; x += 1) {
-      for (let z = minZ; z <= maxZ; z += 1) {
-        const onEdge = x === minX || x === maxX || z === minZ || z === maxZ;
-        if (!onEdge) continue;
-        if (doorEdge === "south" && z === minZ && x === doorX) continue;
-        if (doorEdge === "north" && z === maxZ && x === doorX) continue;
-        if (doorEdge === "west" && x === minX && z === doorZ) continue;
-        if (doorEdge === "east" && x === maxX && z === doorZ) continue;
-        blocks.push({ position: [x, y, z], material: "wood", solid: true });
-      }
-    }
-  }
-
-  addRect(blocks, minX, maxX, minZ, maxZ, 3.5, "wood", true);
-}
-
-/** Stone rim, shallow “water” center, and a small timber roof frame. */
-function addVillageWell(blocks: WorldBlock[], cx: number, cz: number) {
-  addRect(blocks, cx - 1, cx + 1, cz - 1, cz + 1, 0.5, "stoneDark", true);
-  blocks.push({ position: [cx, 1.5, cz], material: "dirt", solid: true });
-  addColumn(blocks, cx - 1, cz - 1, 2, 1.5, "wood");
-  addColumn(blocks, cx + 1, cz - 1, 2, 1.5, "wood");
-  addRect(blocks, cx - 1, cx + 1, cz - 1, cz - 1, 3.5, "wood", true);
-}
-
-/** Tilled-style plot with a path irrigation strip on −X and crop-like leaf stubs. */
-function addVillageFarm(blocks: WorldBlock[], minX: number, maxX: number, minZ: number, maxZ: number) {
-  addRect(blocks, minX, maxX, minZ, maxZ, 0.5, "dirt", true);
-  for (let z = minZ; z <= maxZ; z += 1) {
-    blocks.push({ position: [minX - 1, -0.5, z], material: "path" });
-  }
-  for (let x = minX; x <= maxX; x += 2) {
-    for (let z = minZ; z <= maxZ; z += 2) {
-      blocks.push({ position: [x, 1.5, z], material: "leaves", solid: true });
-    }
-  }
-}
-
-function addLampPost(blocks: WorldBlock[], x: number, z: number) {
-  addColumn(blocks, x, z, 3, 0.5, "stoneDark");
-  blocks.push({ position: [x, 3.5, z], material: "wood", solid: true });
-}
-
-function addHayBaleStack(blocks: WorldBlock[], x: number, z: number) {
-  blocks.push({ position: [x, 0.5, z], material: "dirt", solid: true });
-  blocks.push({ position: [x, 1.5, z], material: "dirt", solid: true });
-}
-
 function buildWorldBlocks() {
   const blocks: WorldBlock[] = [];
   const verticalOffset = 1;
@@ -388,47 +380,15 @@ function buildWorldBlocks() {
     }
   }
 
-  // —— Plains village: roads & plazas (landmark cells stay walkable) ——
-  addRect(blocks, -4, 4, -5, 0, -0.5, "stone");
-  addRect(blocks, -4, 4, -22, -4, -0.5, "path");
-  addRect(blocks, -3, 3, -4, 1, -0.5, "path");
-  addRect(blocks, -10, 10, -12, -10, -0.5, "path");
-  addRect(blocks, -8, 8, -17, -15, -0.5, "path");
-  addRect(blocks, 4, 12, -14, -10, -0.5, "path");
-  addRect(blocks, -12, -4, -17, -12, -0.5, "path");
-  addRect(blocks, -5, 5, -22, -18, -0.5, "stone");
+  // Former village footprint: natural grass from `addTerrainColumn` (no paths or structures).
 
-  addVillageWell(blocks, -4, -10);
-
-  addVillageHouse(blocks, -13, -10, -9, -6, "east");
-  addVillageHouse(blocks, 10, 13, -9, -6, "west");
-  // Corner cottages north of the field strips so farms don’t overlap house footprints.
-  addVillageHouse(blocks, -10, -7, -19, -16, "south");
-  addVillageHouse(blocks, 7, 10, -19, -16, "south");
-  addVillageHouse(blocks, -12, -9, -16, -13, "south");
-  // Keep x = 8 clear for the Projects landmark; house starts at x = 9.
-  addVillageHouse(blocks, 9, 12, -16, -13, "south");
-
-  addVillageFarm(blocks, -12, -8, -22, -20);
-  addVillageFarm(blocks, 8, 12, -22, -20);
-
-  addLampPost(blocks, 1, -11);
-  addLampPost(blocks, -1, -11);
-  addLampPost(blocks, 5, -12);
-  addLampPost(blocks, -5, -12);
-  addLampPost(blocks, 0, -16);
-  addLampPost(blocks, 0, -20);
-
-  addHayBaleStack(blocks, 3, -8);
-  addHayBaleStack(blocks, -3, -8);
-
-  // Trees pushed toward world edges so they don’t clip roofs or roads.
-  addTree(blocks, -17, -11);
-  addTree(blocks, 17, -11);
-  addTree(blocks, -16, -22);
-  addTree(blocks, 16, -22);
-  addTree(blocks, -14, -25);
-  addTree(blocks, 14, -25);
+  // Trees near map edges; inset so canopies stay inside bounds.
+  addTree(blocks, -15, -11);
+  addTree(blocks, 15, -11);
+  addTree(blocks, -15, -22);
+  addTree(blocks, 15, -22);
+  addTree(blocks, -12, -25);
+  addTree(blocks, 12, -25);
 
   // addCloud(blocks, -12, -6);
   // addCloud(blocks, 5, -17);

@@ -75,6 +75,8 @@ type GameWorldHudProps = {
   isDead: boolean;
   /** True after the player has entered the world at least once this session and is now unlocked (Esc). */
   isPaused: boolean;
+  /** While true, hide title/pause overlays while re-requesting pointer lock after closing inventory. */
+  suppressMenuOverlaysForInventoryResume: boolean;
   onQuitToTitle: () => void;
   /** Same user gesture as Enter / Back — must call `canvas.requestPointerLock()` (Drei’s selector wiring can miss the HUD). */
   onRequestPointerLock: () => void;
@@ -114,6 +116,7 @@ export function GameWorldHud({
   locked,
   isDead,
   isPaused,
+  suppressMenuOverlaysForInventoryResume,
   onQuitToTitle,
   onRequestPointerLock,
   onRespawn,
@@ -169,10 +172,10 @@ export function GameWorldHud({
           onDropCursorOnBackdrop={onDropInventoryCursor}
         />
       ) : null}
-      {!locked && !isDead && !inventoryOpen && !isPaused ? (
+      {!locked && !isDead && !inventoryOpen && !isPaused && !suppressMenuOverlaysForInventoryResume ? (
         <MinecraftTitleScreen activePanel={activePanel} onRequestPointerLock={onRequestPointerLock} />
       ) : null}
-      {!locked && !isDead && !inventoryOpen && isPaused ? (
+      {!locked && !isDead && !inventoryOpen && isPaused && !suppressMenuOverlaysForInventoryResume ? (
         <MinecraftPauseMenu
           activePanel={activePanel}
           onQuitToTitle={onQuitToTitle}
