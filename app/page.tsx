@@ -8,6 +8,7 @@ import {
   linkedinProfileUrl,
 } from "@/components/scene/game/config/socialLinks";
 import { spawnBillboardLayout } from "@/components/scene/game/config/spawnBillboardLayout";
+import { assetPath } from "@/lib/assetPrefix";
 
 export default function HomePage() {
   const { photo, introText: intro, publications: pub } = spawnBillboardLayout;
@@ -63,7 +64,7 @@ export default function HomePage() {
                     aria-label="LinkedIn"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/linkedin-logo.svg" alt="" width={24} height={24} />
+                    <img src={assetPath("/textures/world/linkedin-logo.svg")} alt="" width={24} height={24} />
                   </a>
                   <a
                     className="fallback-social-link"
@@ -73,7 +74,7 @@ export default function HomePage() {
                     aria-label="Google Scholar"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/google-scholar-logo.svg" alt="" width={24} height={24} />
+                    <img src={assetPath("/textures/world/google-scholar-logo.svg")} alt="" width={24} height={24} />
                   </a>
                   <a
                     className="fallback-social-link"
@@ -83,7 +84,7 @@ export default function HomePage() {
                     aria-label="GitHub"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/textures/world/github-logo.svg" alt="" width={24} height={24} />
+                    <img src={assetPath("/textures/world/github-logo.svg")} alt="" width={24} height={24} />
                   </a>
                 </div>
               </div>

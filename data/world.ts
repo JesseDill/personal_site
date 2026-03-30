@@ -1,4 +1,5 @@
 import type { InteractionId } from "@/data/interactions";
+import { assetPath } from "@/lib/assetPrefix";
 
 export type WorldMaterial =
   | "grass"
@@ -76,13 +77,13 @@ export const worldSky = {
     moonColor: "#b7cbff",
   },
   sun: {
-    texture: "/textures/sky/minecraft-sun.svg",
+    texture: assetPath("/textures/sky/minecraft-sun.svg"),
     scale: [12, 12, 1] as [number, number, number],
     orbitRadius: 92,
     verticalRadius: 44,
   },
   moon: {
-    texture: "/textures/sky/minecraft-moon.svg",
+    texture: assetPath("/textures/sky/minecraft-moon.svg"),
     scale: [9, 9, 1] as [number, number, number],
     orbitRadius: 84,
     verticalRadius: 38,
