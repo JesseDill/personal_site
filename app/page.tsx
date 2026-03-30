@@ -38,8 +38,6 @@ export default function HomePage() {
       <section id="fallback" className="fallback fallback--spawn-matched" style={sectionBaseStyle}>
         <div className="fallback-inner">
           <div className="fallback-matched-column">
-            <p className="fallback-billboard-kicker">Classic view — same copy and links as the spawn wall</p>
-
             <div className="fallback-spawn-row fallback-spawn-row--intro" style={introRowStyle}>
               <div className="fallback-spawn-intro">
                 <div className="fallback-spawn-intro-body">
