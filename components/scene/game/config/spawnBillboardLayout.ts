@@ -1,3 +1,5 @@
+import { assetPath } from "@/lib/assetPrefix";
+
 /**
  * Single place to tune spawn-wall billboards (photo, intro copy, publications, social row).
  * Social Y is derived from the photo anchor so the row sits just under the portrait.
@@ -74,7 +76,7 @@ export const spawnBillboardLayout: {
 } = {
   photo: {
     position: [-2.22, 5.25, 6.39],
-    texturePath: "/textures/world/jesse_personal_photo.jpeg",
+    texturePath: assetPath("/textures/world/jesse_personal_photo.jpeg"),
     /** World size of the photo frame / plane (increase both to make the portrait larger). */
     width: 1.4,
     height: 1.4,
@@ -88,14 +90,14 @@ export const spawnBillboardLayout: {
     color: "#000000",
     outlineColor: "#000000",
     linkColor: "#004182",
-    // font: "/fonts/IBMPlexMono-Light.ttf",
-    font: "/fonts/IBMPlexMono-Light.ttf",
+    // font: assetPath("/fonts/IBMPlexMono-Light.ttf"),
+    font: assetPath("/fonts/IBMPlexMono-Light.ttf"),
   },
   publications: {
     position: [0.55, 3.38, 6.49],
-    font: "/fonts/IBMPlexMono-Light.ttf",
+    font: assetPath("/fonts/IBMPlexMono-Light.ttf"),
     gif: {
-      path: "/textures/world/room_uncertainty_visual.png",
+      path: assetPath("/textures/world/room_uncertainty_visual.png"),
       width: 1.56,
       height: 1.56,
       position: [-1.78, -0.39, 0.03],
