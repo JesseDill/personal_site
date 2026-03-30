@@ -128,9 +128,9 @@ export default function GameScene() {
   const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedInventorySlot, setSelectedInventorySlot] = useState(0);
   const [respawnToken, setRespawnToken] = useState(0);
-  const [health, setHealth] = useState(healthConfig.maxHealth);
+  const [health, setHealth] = useState<number>(healthConfig.maxHealth);
   const maxHealth = healthConfig.maxHealth;
-  const [hunger, setHunger] = useState(hungerConfig.maxHunger);
+  const [hunger, setHunger] = useState<number>(hungerConfig.maxHunger);
   const hungerSaturationRef = useRef(0);
   const [hungerSaturationDisplay, setHungerSaturationDisplay] = useState(0);
   const [xpLevel] = useState(0);
