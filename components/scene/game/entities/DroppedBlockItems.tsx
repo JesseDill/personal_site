@@ -4,7 +4,6 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { DroppedBlockItem } from "../types";
-import { assetPath } from "@/lib/assetPrefix";
 import { cubeFaceOrder } from "../materials/types";
 import { faceTexturePaths } from "../materials/voxelMaterialPalette";
 import { useVoxelTextures } from "../materials/useVoxelTextures";
@@ -128,7 +127,7 @@ export function DroppedBlockItems({
   const faceTexturesByMaterial = useMemo(
     () =>
       ({
-        dirt: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/dirt.svg")]),
+        dirt: cubeFaceOrder.map(() => texturesByPath["/textures/world/dirt.svg"]),
         wood: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.wood[face]]),
       }) satisfies Record<DroppedBlockItem["material"], THREE.Texture[]>,
     [texturesByPath],

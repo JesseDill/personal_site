@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { assetPath } from "@/lib/assetPrefix";
 import { hotbarSlotCount } from "../config/inventory";
 import type { DroppedBlockItem, InventorySlot } from "../types";
 import type { InventoryArea } from "../inventory/inventorySlotActions";
@@ -13,14 +12,14 @@ type HudIconState = "full" | "half" | "empty";
 
 const hudIconTextures = {
   heart: {
-    full: assetPath("/textures/UI/heart-full.svg"),
-    half: assetPath("/textures/UI/heart-half.svg"),
-    empty: assetPath("/textures/UI/heart-empty.svg"),
+    full: "/textures/UI/heart-full.svg",
+    half: "/textures/UI/heart-half.svg",
+    empty: "/textures/UI/heart-empty.svg",
   },
   hunger: {
-    full: assetPath("/textures/UI/hunger-full.svg"),
-    half: assetPath("/textures/UI/hunger-half.svg"),
-    empty: assetPath("/textures/UI/hunger-empty.svg"),
+    full: "/textures/UI/hunger-full.svg",
+    half: "/textures/UI/hunger-half.svg",
+    empty: "/textures/UI/hunger-empty.svg",
   },
 } as const;
 

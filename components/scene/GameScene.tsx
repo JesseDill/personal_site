@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { worldBlocks, worldSky } from "@/data/world";
-import { assetPath } from "@/lib/assetPrefix";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
 import { hotbarSlotCount, inventoryStackLimit, mainInventorySlotCount } from "./game/config/inventory";
@@ -704,21 +703,21 @@ export default function GameScene() {
         <BillboardSocialSign
           label="LinkedIn"
           href={linkedinProfileUrl}
-          texturePath={assetPath("/textures/world/linkedin-logo.svg")}
+          texturePath="/textures/world/linkedin-logo.svg"
           position={spawnSocialPositions.linkedin}
           isActive={targetHref === linkedinProfileUrl}
         />
         <BillboardSocialSign
           label="Google Scholar"
           href={googleScholarProfileUrl}
-          texturePath={assetPath("/textures/world/google-scholar-logo.svg")}
+          texturePath="/textures/world/google-scholar-logo.svg"
           position={spawnSocialPositions.googleScholar}
           isActive={targetHref === googleScholarProfileUrl}
         />
         <BillboardSocialSign
           label="GitHub"
           href={githubProfileUrl}
-          texturePath={assetPath("/textures/world/github-logo.svg")}
+          texturePath="/textures/world/github-logo.svg"
           position={spawnSocialPositions.github}
           isActive={targetHref === githubProfileUrl}
         />

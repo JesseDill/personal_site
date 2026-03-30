@@ -483,12 +483,11 @@ a {
     1px 1px 0 #1f1f1f;
 }
 
-/* Public asset URLs: must match `basePath` in next.config.mjs (GitHub Pages subpath). */
 .mc-xp-track {
   position: static;
   width: var(--mc-xp-width);
   height: var(--mc-xp-height);
-  background-image: url("/personal_site/textures/UI/xp-bar-bg.svg");
+  background-image: url("/textures/UI/xp-bar-bg.svg");
   background-repeat: repeat-x;
   background-position: center;
   background-size: auto auto;
@@ -500,7 +499,7 @@ a {
   inset: 0 auto 0 0;
   min-width: 0;
   height: 100%;
-  background-image: url("/personal_site/textures/UI/xp-bar-fill.svg");
+  background-image: url("/textures/UI/xp-bar-fill.svg");
   background-repeat: no-repeat;
   background-position: left center;
   background-size: 100% 100%;
@@ -650,7 +649,7 @@ a {
 
 @font-face {
   font-family: "IBMPlexMonoBillboard";
-  src: url("/personal_site/fonts/IBMPlexMono-Light.ttf") format("truetype");
+  src: url("/fonts/IBMPlexMono-Light.ttf") format("truetype");
   font-weight: 300;
   font-display: swap;
 }

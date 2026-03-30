@@ -1,12 +1,11 @@
 import type { WorldMaterial } from "@/data/world";
-import { assetPath } from "@/lib/assetPrefix";
 
 export const blockBreakTexturePaths = [
-  assetPath("/textures/world/block-break-stage-1.svg"),
-  assetPath("/textures/world/block-break-stage-2.svg"),
-  assetPath("/textures/world/block-break-stage-3.svg"),
-  assetPath("/textures/world/block-break-stage-4.svg"),
-  assetPath("/textures/world/block-break-stage-5.svg"),
+  "/textures/world/block-break-stage-1.svg",
+  "/textures/world/block-break-stage-2.svg",
+  "/textures/world/block-break-stage-3.svg",
+  "/textures/world/block-break-stage-4.svg",
+  "/textures/world/block-break-stage-5.svg",
 ] as const;
 
 export const blockBreakHitsRequired = {

@@ -1,4 +1,3 @@
-import { assetPath } from "@/lib/assetPrefix";
 import type { CubeFace } from "./types";
 import { cubeFaceOrder } from "./types";
 
@@ -27,19 +26,19 @@ function resolveFaceTexturesArm(textures: {
 
 export const armTextureDefinitions = {
   skin: {
-    side: assetPath("/textures/player/minecraft_arm_one_side.jpg"),
-    top: assetPath("/textures/player/minecraft_arm_top.png"),
-    bottom: assetPath("/textures/player/arm-skin-bottom.svg"),
+    side: "/textures/player/minecraft_arm_one_side.jpg",
+    top: "/textures/player/minecraft_arm_top.png",
+    bottom: "/textures/player/arm-skin-bottom.svg",
   },
   sleeve: {
-    side: assetPath("/textures/player/arm-sleeve-side.svg"),
-    top: assetPath("/textures/player/arm-sleeve-top.svg"),
-    bottom: assetPath("/textures/player/arm-sleeve-bottom.svg"),
+    side: "/textures/player/arm-sleeve-side.svg",
+    top: "/textures/player/arm-sleeve-top.svg",
+    bottom: "/textures/player/arm-sleeve-bottom.svg",
   },
   cuff: {
-    side: assetPath("/textures/player/arm-cuff-side.svg"),
-    top: assetPath("/textures/player/arm-cuff-top.svg"),
-    bottom: assetPath("/textures/player/arm-cuff-bottom.svg"),
+    side: "/textures/player/arm-cuff-side.svg",
+    top: "/textures/player/arm-cuff-top.svg",
+    bottom: "/textures/player/arm-cuff-bottom.svg",
   },
 } as const;
 
