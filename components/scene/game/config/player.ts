@@ -1,5 +1,3 @@
-import { landmarks } from "@/data/world";
-
 /** Walk speed multiplier when holding Shift while moving forward (W). */
 export const playerSprintMultiplier = 1.3;
 
@@ -22,7 +20,5 @@ export const playerCollisionConfig = {
 export const playerSpawnPosition: [number, number, number] = [0, playerCollisionConfig.eyeHeight + 2, 2.5];
 export const playerSpawnRotation: [number, number, number] = [-Math.PI/64, Math.PI, 0];
 
-/** Cells where landmark pads sit — player cannot stand here. */
-export const blockedLandmarkCells = new Set(
-  landmarks.map((landmark) => `${Math.round(landmark.position[0])}:${Math.round(landmark.position[2])}`),
-);
+/** Reserved for future landmark pads; empty while landmark meshes are removed from the scene. */
+export const blockedLandmarkCells = new Set<string>();

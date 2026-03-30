@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
-import { landmarks, worldBlocks, worldSky } from "@/data/world";
+import { worldBlocks, worldSky } from "@/data/world";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
 import { hotbarSlotCount, inventoryStackLimit, mainInventorySlotCount } from "./game/config/inventory";
@@ -27,7 +27,6 @@ import {
 } from "./game/entities/Billboards";
 import { BillboardPublicationRow } from "./game/entities/BillboardPublicationRow";
 import { DroppedBlockItems } from "./game/entities/DroppedBlockItems";
-import { InteractableLandmark } from "./game/entities/InteractableLandmark";
 import { TerrainBreakOverlay } from "./game/entities/TerrainBreakOverlay";
 import { TerrainImpactParticles } from "./game/entities/TerrainImpactParticles";
 import { InteractionRaycast } from "./game/interaction/InteractionRaycast";
@@ -703,9 +702,6 @@ export default function GameScene() {
           isActive={targetHref === githubProfileUrl}
         />
         <BillboardPublicationRow />
-        {landmarks.map((landmark) => (
-          <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
-        ))}
 
         {(locked || heldInventoryMaterial) && !activePanel && !inventoryOpen ? (
           <Hud renderPriority={1}>
