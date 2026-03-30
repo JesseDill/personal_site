@@ -112,6 +112,7 @@ a {
 .collected-inventory,
 .mc-pause-dim,
 .mc-death-dim,
+.mc-inventory-dim,
 .mc-menu-root {
   pointer-events: auto;
 }
@@ -1013,6 +1014,195 @@ a {
   background: rgba(0, 0, 0, 0.52);
   pointer-events: auto;
   backdrop-filter: grayscale(0.35) brightness(0.72);
+}
+
+/* Minecraft-style inventory (E key) */
+:root {
+  --mc-inv-slot-size: 2.5rem;
+}
+
+.mc-inventory-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: grayscale(0.2) brightness(0.62);
+  cursor: default;
+}
+
+.mc-inventory-root {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(96vw, 38rem);
+  padding: 1rem 1.25rem 1.25rem;
+  background: linear-gradient(180deg, rgba(198, 198, 198, 0.96) 0%, rgba(139, 139, 139, 0.98) 100%);
+  border: 3px solid rgba(80, 80, 80, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+  color: #1a1a1a;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.65rem;
+}
+
+.mc-inventory-hint {
+  margin: 0 0 0.6rem;
+  opacity: 0.85;
+  font-size: 0.58rem;
+}
+
+.mc-inventory-top-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.85rem;
+}
+
+.mc-inventory-placeholder-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.mc-inventory-armor-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.mc-inventory-player-preview {
+  min-height: 6.5rem;
+  border: 2px dashed rgba(60, 60, 60, 0.45);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  background: rgba(30, 30, 35, 0.35);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mc-inventory-placeholder-sub {
+  font-size: 0.5rem;
+  opacity: 0.8;
+}
+
+.mc-inventory-crafting-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mc-inventory-crafting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, var(--mc-inv-slot-size));
+  gap: 0.2rem;
+}
+
+.mc-inventory-crafting-arrow {
+  font-size: 1rem;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.mc-inventory-section-label {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.mc-inventory-grid {
+  display: grid;
+  gap: 0.2rem;
+  justify-content: start;
+}
+
+.mc-inventory-grid--main {
+  margin-bottom: 0.65rem;
+}
+
+.mc-inventory-grid--hotbar {
+  padding-top: 0.35rem;
+  border-top: 2px solid rgba(60, 60, 60, 0.35);
+}
+
+.mc-inventory-slot {
+  position: relative;
+  width: var(--mc-inv-slot-size);
+  height: var(--mc-inv-slot-size);
+  padding: 0;
+  border: 2px solid rgba(55, 55, 55, 0.9);
+  background: rgba(139, 139, 139, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mc-inventory-slot:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(160, 160, 160, 0.65);
+}
+
+.mc-inventory-slot--selected {
+  outline: 2px solid rgba(255, 220, 120, 0.95);
+  outline-offset: 1px;
+}
+
+.mc-inventory-slot--placeholder {
+  pointer-events: none;
+  opacity: 0.65;
+  cursor: default;
+}
+
+.mc-inventory-slot .collected-slot-voxel,
+.mc-inventory-slot .collected-slot-voxel-canvas {
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+}
+
+.mc-inventory-slot-count {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    1px 1px 0 #222,
+    -1px -1px 0 #222;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.mc-inventory-cursor-item {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10001;
+  pointer-events: none;
+  transform: translate(10px, 10px);
+  width: var(--mc-inv-slot-size);
+  height: var(--mc-inv-slot-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mc-inventory-cursor-item .collected-slot-voxel,
+.mc-inventory-cursor-item .collected-slot-voxel-canvas {
+  width: 2rem !important;
+  height: 2rem !important;
 }
 
 .mc-death-dim {

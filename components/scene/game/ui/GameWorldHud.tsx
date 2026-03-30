@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { hotbarSlotCount } from "../config/inventory";
-import type { DroppedBlockItem } from "../types";
+import type { DroppedBlockItem, InventorySlot } from "../types";
+import type { InventoryArea } from "../inventory/inventorySlotActions";
 import { InventoryVoxelIcon } from "./InventoryVoxelIcon";
 import { MinecraftDeathScreen, MinecraftPauseMenu, MinecraftTitleScreen } from "./MinecraftGameMenus";
+import { MinecraftInventoryScreen } from "./MinecraftInventoryScreen";
 
 type HudIconState = "full" | "half" | "empty";
 
@@ -79,15 +81,20 @@ type GameWorldHudProps = {
   onRespawn: () => void;
   onDeathReturnToTitle: () => void;
   activePanel: boolean;
+  inventoryOpen: boolean;
+  mainInventorySlots: InventorySlot[];
+  hotbarSlots: InventorySlot[];
+  cursorItem: InventorySlot;
+  onInventorySlotClick: (area: InventoryArea, index: number, button: "left" | "right") => void;
+  onDropInventoryCursor: () => void;
+  onSelectHotbarFromInventory: (index: number) => void;
   targetLabel: string | null;
   crosshairScreenPosition?: { x: number; y: number } | null;
   /** After true, camera follows mouse — show classic + crosshair; before that, show MC-style pointer while look is frozen. */
   spawnLookUnlocked: boolean;
   /** Optional image for spawn pointer; `null` uses the built-in SVG. Use a `/…` path into `public/`. */
   spawnCursorImageSrc?: string | null;
-  hotbarSlots: (DroppedBlockItem["material"] | null)[];
   selectedInventorySlot: number;
-  collectedInventory: Record<DroppedBlockItem["material"], number>;
   health: number;
   maxHealth: number;
   hunger: number;
@@ -112,13 +119,18 @@ export function GameWorldHud({
   onRespawn,
   onDeathReturnToTitle,
   activePanel,
+  inventoryOpen,
+  mainInventorySlots,
+  hotbarSlots,
+  cursorItem,
+  onInventorySlotClick,
+  onDropInventoryCursor,
+  onSelectHotbarFromInventory,
   targetLabel,
   crosshairScreenPosition,
   spawnLookUnlocked,
   spawnCursorImageSrc = null,
-  hotbarSlots,
   selectedInventorySlot,
-  collectedInventory,
   health,
   maxHealth,
   hunger,
@@ -146,10 +158,21 @@ export function GameWorldHud({
   return (
     <div className="hud">
       {!locked && isDead ? <MinecraftDeathScreen onRespawn={onRespawn} onReturnToTitle={onDeathReturnToTitle} /> : null}
-      {!locked && !isDead && !isPaused ? (
+      {!locked && !isDead && inventoryOpen ? (
+        <MinecraftInventoryScreen
+          mainInventorySlots={mainInventorySlots}
+          hotbarSlots={hotbarSlots}
+          cursorItem={cursorItem}
+          selectedInventorySlot={selectedInventorySlot}
+          onSelectHotbarSlot={onSelectHotbarFromInventory}
+          onSlotClick={onInventorySlotClick}
+          onDropCursorOnBackdrop={onDropInventoryCursor}
+        />
+      ) : null}
+      {!locked && !isDead && !inventoryOpen && !isPaused ? (
         <MinecraftTitleScreen activePanel={activePanel} onRequestPointerLock={onRequestPointerLock} />
       ) : null}
-      {!locked && !isDead && isPaused ? (
+      {!locked && !isDead && !inventoryOpen && isPaused ? (
         <MinecraftPauseMenu
           activePanel={activePanel}
           onQuitToTitle={onQuitToTitle}
@@ -157,7 +180,7 @@ export function GameWorldHud({
         />
       ) : null}
 
-      {locked && crosshairScreenPosition ? (
+      {locked && crosshairScreenPosition && !inventoryOpen ? (
         <div
           className={`hud-aim-layer ${spawnLookUnlocked ? "hud-aim-layer--look" : "hud-aim-layer--spawn"}`}
           style={aimStyle}
@@ -191,7 +214,7 @@ export function GameWorldHud({
       ) : null}
 
       {/* Hover label from `InteractionRaycast` → colors: `app/globals.css` :root `--interaction-tooltip-*` */}
-      {targetLabel && locked ? (
+      {targetLabel && locked && !inventoryOpen ? (
         <div className="tooltip" style={tooltipStyle}>
           {targetLabel}
         </div>
@@ -247,11 +270,12 @@ export function GameWorldHud({
           <p className="collected-inventory-title">Collected</p>
         <div className="collected-inventory-grid">
           {Array.from({ length: hotbarSlotCount }, (_, index) => {
-            const material = hotbarSlots[index] ?? null;
+            const slot = hotbarSlots[index] ?? null;
+            const material = slot?.material ?? null;
 
             return (
               <div
-                key={material ?? `empty-slot-${index}`}
+                key={`hotbar-hud-${index}`}
                 className={`collected-slot${selectedInventorySlot === index ? " selected" : ""}`}
                 aria-selected={selectedInventorySlot === index}
                 onClick={() => {
@@ -264,10 +288,10 @@ export function GameWorldHud({
                   if (material) onSlotMouseLeave(material);
                 }}
               >
-                {material ? (
+                {slot ? (
                   <>
-                    <InventoryVoxelIcon material={material} />
-                    <span className="collected-slot-count">{collectedInventory[material]}</span>
+                    <InventoryVoxelIcon material={slot.material} />
+                    <span className="collected-slot-count">{slot.count}</span>
                   </>
                 ) : (
                   <span className="collected-slot-empty" aria-hidden="true" />

@@ -17,6 +17,11 @@ export const collectedInventoryMaterials = Object.keys(collectedInventoryConfig)
 
 export const hotbarSlotCount = 9;
 
+export const mainInventorySlotCount = 27;
+
+/** Max items per stack (Minecraft-style). */
+export const inventoryStackLimit = 64;
+
 export const hotbarPreviewTexturePaths = Array.from(
   new Set(collectedInventoryMaterials.flatMap((material) => collectedInventoryConfig[material].faceTextures)),
 );

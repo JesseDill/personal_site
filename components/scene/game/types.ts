@@ -28,6 +28,12 @@ export type DroppedBlockItem = {
   drift: [number, number];
 };
 
+/** One inventory cell: stacked items of a single material, or empty. */
+export type InventorySlot = {
+  material: DroppedBlockItem["material"];
+  count: number;
+} | null;
+
 export type TerrainBreakOverlayState = {
   blockKey: string;
   blockPosition: [number, number, number];

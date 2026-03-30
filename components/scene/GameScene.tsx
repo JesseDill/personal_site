@@ -1,14 +1,15 @@
 "use client";
 
 import { Hud, PerspectiveCamera, PointerLockControls } from "@react-three/drei";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import { landmarks, worldBlocks, worldSky } from "@/data/world";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
-import { hotbarSlotCount } from "./game/config/inventory";
+import { hotbarSlotCount, inventoryStackLimit, mainInventorySlotCount } from "./game/config/inventory";
+import { playerCollisionConfig } from "./game/config/player";
 import { spawnCursorImageSrc } from "./game/config/spawnCursor";
 import { unbreakableTerrainMaterials } from "./game/config/mining";
 import { buildIntroTextColorRanges } from "./game/config/introBillboardCopy";
@@ -34,10 +35,12 @@ import { PlayerArmViewmodel } from "./game/player/PlayerArmViewmodel";
 import { PlayerController } from "./game/player/PlayerController";
 import { useTerrainOccupancy } from "./game/state/useTerrainOccupancy";
 import { SkySystem } from "./game/sky/SkySystem";
-import type { BreakableTerrainHit, DroppedBlockItem } from "./game/types";
+import type { BreakableTerrainHit, DroppedBlockItem, InventorySlot } from "./game/types";
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
 import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks";
 import { VoxelWorld } from "./game/world/VoxelWorld";
+import { applyInventorySlotClick, tryAddOneItem } from "./game/inventory/inventorySlotActions";
+import type { InventoryArea } from "./game/inventory/inventorySlotActions";
 import { GameWorldHud } from "./game/ui/GameWorldHud";
 import { InteractionPanel } from "./game/ui/InteractionPanel";
 
@@ -77,6 +80,35 @@ function ScenePointerLockControls({
   );
 }
 
+type WorldDropOrigin = {
+  blockPosition: [number, number, number];
+  driftBase: [number, number];
+};
+
+function WorldDropOriginSync({ originRef }: { originRef: React.MutableRefObject<WorldDropOrigin | null> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const fwd = new THREE.Vector3();
+    camera.getWorldDirection(fwd);
+    fwd.y = 0;
+    if (fwd.lengthSq() < 1e-8) {
+      fwd.set(0, 0, -1);
+    } else {
+      fwd.normalize();
+    }
+    const feetY = camera.position.y - playerCollisionConfig.eyeHeight;
+    originRef.current = {
+      blockPosition: [
+        camera.position.x + fwd.x * 0.35,
+        feetY + 0.25,
+        camera.position.z + fwd.z * 0.35,
+      ],
+      driftBase: [fwd.x * 0.9, fwd.z * 0.9],
+    };
+  });
+  return null;
+}
+
 export default function GameScene() {
   const [target, setTarget] = useState<InteractionId | null>(null);
   const [targetLabel, setTargetLabel] = useState<string | null>(null);
@@ -104,14 +136,21 @@ export default function GameScene() {
   const [hungerSaturationDisplay, setHungerSaturationDisplay] = useState(0);
   const [xpLevel] = useState(0);
   const [xpProgress] = useState(0);
-  const [collectedInventory, setCollectedInventory] = useState<Record<DroppedBlockItem["material"], number>>({
-    dirt: 0,
-    wood: 0,
-  });
-  /** Stable slot assignment: first pickup fills slot 0, next new type fills next empty slot (order does not reshuffle). */
-  const [hotbarSlots, setHotbarSlots] = useState<(DroppedBlockItem["material"] | null)[]>(() =>
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [cursorItem, setCursorItem] = useState<InventorySlot>(null);
+  const [mainInventorySlots, setMainInventorySlots] = useState<InventorySlot[]>(() =>
+    Array.from({ length: mainInventorySlotCount }, () => null),
+  );
+  const [hotbarSlots, setHotbarSlots] = useState<InventorySlot[]>(() =>
     Array.from({ length: hotbarSlotCount }, () => null),
   );
+
+  const hotbarSlotsRef = useRef(hotbarSlots);
+  const mainInventorySlotsRef = useRef(mainInventorySlots);
+  const cursorItemRef = useRef(cursorItem);
+  hotbarSlotsRef.current = hotbarSlots;
+  mainInventorySlotsRef.current = mainInventorySlots;
+  cursorItemRef.current = cursorItem;
 
   const {
     removedTerrainBlockKeys,
@@ -124,6 +163,7 @@ export default function GameScene() {
 
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const worldCanvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const worldDropOriginRef = useRef<WorldDropOrigin | null>(null);
 
   const requestWorldPointerLockRaw = useCallback(() => {
     worldCanvasElRef.current?.requestPointerLock();
@@ -214,16 +254,6 @@ export default function GameScene() {
     setHasEnteredWorldThisSession(false);
   }, [resetVitals]);
 
-  useEffect(() => {
-    if (health !== 0) return;
-    document.exitPointerLock();
-    setScreenShakeActive(false);
-    if (screenShakeTimerRef.current) {
-      clearTimeout(screenShakeTimerRef.current);
-      screenShakeTimerRef.current = null;
-    }
-  }, [health]);
-
   const handleFallLand = useCallback(
     (fallDistance: number) => {
       const blocks = Math.floor(fallDistance);
@@ -308,56 +338,126 @@ export default function GameScene() {
     }
   }, [placedTerrainBlocksRef, setPlacedTerrainBlocks, setRemovedTerrainBlockKeys]);
 
-  const collectDroppedItem = useCallback((item: DroppedBlockItem) => {
-    setDroppedItems((current) => current.filter((entry) => entry.id !== item.id));
-    setCollectedInventory((current) => ({
-      ...current,
-      [item.material]: current[item.material] + 1,
-    }));
-    setHotbarSlots((slots) => {
-      if (slots.some((s) => s === item.material)) return slots;
-      const emptyIndex = slots.findIndex((s) => s === null);
-      if (emptyIndex === -1) return slots;
-      const next = [...slots];
-      next[emptyIndex] = item.material;
+  const spawnDroppedItemsFromStack = useCallback((stack: NonNullable<InventorySlot>) => {
+    const origin = worldDropOriginRef.current;
+    if (!origin) return;
+    setDroppedItems((current) => {
+      const next = [...current];
+      const baseLen = next.length;
+      for (let i = 0; i < stack.count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.35 + Math.random() * 0.35;
+        next.push({
+          id: `inv-drop-${Date.now()}-${baseLen + i}-${Math.random().toString(36).slice(2, 9)}`,
+          material: stack.material,
+          blockPosition: [...origin.blockPosition] as [number, number, number],
+          spawnedAt: performance.now() / 1000,
+          phase: Math.random() * Math.PI * 2,
+          drift: [
+            origin.driftBase[0] + Math.cos(angle) * speed,
+            origin.driftBase[1] + Math.sin(angle) * speed,
+          ] as [number, number],
+        });
+      }
       return next;
     });
   }, []);
+
+  const dropCursorStackIfAny = useCallback(() => {
+    const c = cursorItemRef.current;
+    if (c) {
+      spawnDroppedItemsFromStack(c);
+      setCursorItem(null);
+    }
+  }, [spawnDroppedItemsFromStack]);
+
+  const closeInventory = useCallback(() => {
+    dropCursorStackIfAny();
+    setInventoryOpen(false);
+    requestWorldPointerLock();
+  }, [dropCursorStackIfAny, requestWorldPointerLock]);
+
+  const openInventory = useCallback(() => {
+    if (!locked || activePanel || health <= 0) return;
+    setInventoryOpen(true);
+    document.exitPointerLock();
+  }, [locked, activePanel, health]);
+
+  const handleInventorySlotClick = useCallback((area: InventoryArea, index: number, button: "left" | "right") => {
+    const next = applyInventorySlotClick(
+      {
+        mainInventorySlots: mainInventorySlotsRef.current,
+        hotbarSlots: hotbarSlotsRef.current,
+        cursorItem: cursorItemRef.current,
+      },
+      area,
+      index,
+      button,
+      inventoryStackLimit,
+    );
+    setHotbarSlots(next.hotbarSlots);
+    setMainInventorySlots(next.mainInventorySlots);
+    setCursorItem(next.cursorItem);
+  }, []);
+
+  const handleDropInventoryCursor = useCallback(() => {
+    dropCursorStackIfAny();
+  }, [dropCursorStackIfAny]);
+
+  const collectDroppedItem = useCallback((item: DroppedBlockItem) => {
+    const next = tryAddOneItem(
+      hotbarSlotsRef.current,
+      mainInventorySlotsRef.current,
+      item.material,
+      inventoryStackLimit,
+    );
+    if (!next) return;
+    setHotbarSlots(next.hotbarSlots);
+    setMainInventorySlots(next.mainInventorySlots);
+    setDroppedItems((current) => current.filter((entry) => entry.id !== item.id));
+  }, []);
+
+  useEffect(() => {
+    if (health !== 0) return;
+    document.exitPointerLock();
+    setInventoryOpen(false);
+    const c = cursorItemRef.current;
+    if (c) {
+      spawnDroppedItemsFromStack(c);
+      setCursorItem(null);
+    }
+    setScreenShakeActive(false);
+    if (screenShakeTimerRef.current) {
+      clearTimeout(screenShakeTimerRef.current);
+      screenShakeTimerRef.current = null;
+    }
+  }, [health, spawnDroppedItemsFromStack]);
 
   const placeTerrainBlock = useCallback(
     (material: DroppedBlockItem["material"], blockPosition: [number, number, number]) => {
       const blockKey = getTerrainBlockKey(blockPosition);
       const worldMaterial = material === "wood" ? "wood" : "dirt";
 
-    setCollectedInventory((current) => {
-      if (current[material] <= 0) return current;
-        const nextCount = current[material] - 1;
-        if (nextCount === 0) {
-          setHotbarSlots((slots) => {
-            const idx = slots.findIndex((s) => s === material);
-            if (idx === -1) return slots;
-            const nextSlots = [...slots];
-            nextSlots[idx] = null;
-            return nextSlots;
-          });
-        }
-      return {
-        ...current,
-          [material]: nextCount,
-      };
-    });
+      setHotbarSlots((slots) => {
+        const sel = slots[selectedInventorySlot];
+        if (!sel || sel.material !== material || sel.count <= 0) return slots;
+        const next = [...slots];
+        const nc = sel.count - 1;
+        next[selectedInventorySlot] = nc <= 0 ? null : { material: sel.material, count: nc };
+        return next;
+      });
 
-    setPlacedTerrainBlocks((current) => {
+      setPlacedTerrainBlocks((current) => {
         if (current.some((entry) => getTerrainBlockKey(entry.position) === blockKey)) return current;
-      return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
-    });
+        return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
+      });
     },
-    [setPlacedTerrainBlocks],
+    [selectedInventorySlot, setPlacedTerrainBlocks],
   );
 
   useEffect(() => {
     const handleHotbarKeyDown = (event: KeyboardEvent) => {
-      if (!locked || activePanel) return;
+      if (!locked || activePanel || inventoryOpen) return;
       if (!event.code.startsWith("Digit")) return;
 
       const nextSlot = Number(event.code.replace("Digit", "")) - 1;
@@ -369,10 +469,30 @@ export default function GameScene() {
 
     window.addEventListener("keydown", handleHotbarKeyDown);
     return () => window.removeEventListener("keydown", handleHotbarKeyDown);
-  }, [activePanel, locked]);
+  }, [activePanel, inventoryOpen, locked]);
 
   useEffect(() => {
-    if (!locked || spawnLookUnlocked) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "KeyE" && !event.repeat) {
+        if (inventoryOpen) {
+          event.preventDefault();
+          closeInventory();
+        } else if (locked && !activePanel && health > 0) {
+          event.preventDefault();
+          openInventory();
+        }
+      }
+      if (event.key === "Escape" && inventoryOpen) {
+        event.preventDefault();
+        closeInventory();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activePanel, closeInventory, health, inventoryOpen, locked, openInventory]);
+
+  useEffect(() => {
+    if (!locked || spawnLookUnlocked || inventoryOpen) return;
 
     const unlockSpawnLook = () => {
       setSpawnLookUnlocked(true);
@@ -403,7 +523,7 @@ export default function GameScene() {
       window.removeEventListener("mousemove", handleSpawnMouseMove);
       window.removeEventListener("keydown", handleSpawnKeyDown);
     };
-  }, [getCanvasRect, locked, resetSpawnCursorToViewportCenter, spawnCursorScreenPosition, spawnLookUnlocked]);
+  }, [getCanvasRect, inventoryOpen, locked, resetSpawnCursorToViewportCenter, spawnCursorScreenPosition, spawnLookUnlocked]);
 
   useEffect(() => {
     if (spawnLookUnlocked || !locked) {
@@ -465,8 +585,11 @@ export default function GameScene() {
     setHoveredInventoryMaterial(null);
   }, [activePanel, locked]);
 
-  const selectedInventoryMaterial = hotbarSlots[selectedInventorySlot] ?? null;
+  const selectedInventoryMaterial = hotbarSlots[selectedInventorySlot]?.material ?? null;
   const heldInventoryMaterial = hoveredInventoryMaterial ?? selectedInventoryMaterial;
+  const selectedHotbarSlot = hotbarSlots[selectedInventorySlot];
+  const placementAvailableCount =
+    selectedHotbarSlot && heldInventoryMaterial === selectedHotbarSlot.material ? selectedHotbarSlot.count : 0;
   const interactionPointerNdc = useMemo(() => {
     if (!locked || spawnLookUnlocked || !spawnCursorScreenPosition) {
       return { x: 0, y: 0 };
@@ -523,9 +646,10 @@ export default function GameScene() {
           directionalLightRef={directionalLightRef}
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
+        <WorldDropOriginSync originRef={worldDropOriginRef} />
         <DroppedBlockItems
           items={droppedItems}
-          canCollect={locked && !activePanel}
+          canCollect={locked && !activePanel && !inventoryOpen}
           onCollect={collectDroppedItem}
           getOccupancySnapshot={getOccupancySnapshot}
         />
@@ -545,7 +669,7 @@ export default function GameScene() {
         <BlockPlacementController
           enabled={locked && !activePanel}
           heldInventoryMaterial={heldInventoryMaterial}
-          availableCount={heldInventoryMaterial ? collectedInventory[heldInventoryMaterial] : 0}
+          availableCount={placementAvailableCount}
           onPlaceBlock={placeTerrainBlock}
           onPlaceSwing={triggerPlacementSwing}
           getOccupancySnapshot={getOccupancySnapshot}
@@ -583,7 +707,7 @@ export default function GameScene() {
           <InteractableLandmark key={landmark.id} id={landmark.id} isActive={target === landmark.id} />
         ))}
 
-        {(locked || heldInventoryMaterial) && !activePanel ? (
+        {(locked || heldInventoryMaterial) && !activePanel && !inventoryOpen ? (
           <Hud renderPriority={1}>
             <PerspectiveCamera makeDefault position={[0, 0, 3.2]} fov={48} />
             <PlayerArmViewmodel
@@ -627,13 +751,18 @@ export default function GameScene() {
         onRespawn={handleRespawn}
         onDeathReturnToTitle={handleDeathReturnToTitle}
         activePanel={Boolean(activePanel)}
+        inventoryOpen={inventoryOpen}
+        mainInventorySlots={mainInventorySlots}
+        hotbarSlots={hotbarSlots}
+        cursorItem={cursorItem}
+        onInventorySlotClick={handleInventorySlotClick}
+        onDropInventoryCursor={handleDropInventoryCursor}
+        onSelectHotbarFromInventory={setSelectedInventorySlot}
         targetLabel={targetLabel}
         crosshairScreenPosition={locked ? spawnCursorScreenPosition : null}
         spawnLookUnlocked={spawnLookUnlocked}
         spawnCursorImageSrc={spawnCursorImageSrc}
-        hotbarSlots={hotbarSlots}
         selectedInventorySlot={selectedInventorySlot}
-        collectedInventory={collectedInventory}
         health={health}
         maxHealth={maxHealth}
         hunger={hunger}
