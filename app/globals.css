@@ -984,6 +984,10 @@ a {
 }
 
 @media (max-width: 720px) {
+  .fallback.fallback--spawn-matched {
+    --fallback-nudge-x: 0px;
+  }
+
   .desktop-scene {
     min-height: 0;
   }
