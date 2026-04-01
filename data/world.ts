@@ -12,6 +12,9 @@ export type WorldMaterial =
   | "stone"
   | "stoneDark"
   | "wood"
+  | "glass"
+  | "woodPlanks"
+  | "cobblestone"
   | "leaves"
   | "aboutAccent"
   | "resumeAccent"
@@ -397,6 +400,11 @@ function buildWorldBlocks() {
 
   addPerimeterWalls(blocks);
   addSpawnBillboard(blocks);
+
+  // Showcase row in front of spawn (z=4); cubes use instanced voxels — door/stairs mount in GameScene.
+  blocks.push({ position: [-1, 0.5, 4], material: "glass", solid: true });
+  blocks.push({ position: [0, 0.5, 4], material: "woodPlanks", solid: true });
+  blocks.push({ position: [2, 0.5, 4], material: "cobblestone", solid: true });
 
   const dedupedBlocks = new Map<string, WorldBlock>();
 

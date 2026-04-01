@@ -38,6 +38,8 @@ import { SkySystem } from "./game/sky/SkySystem";
 import type { BreakableTerrainHit, DroppedBlockItem, InventorySlot } from "./game/types";
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
 import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks";
+import { DoorBlock } from "./game/world/DoorBlock";
+import { StairBlock } from "./game/world/StairBlock";
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { applyInventorySlotClick, tryAddOneItem } from "./game/inventory/inventorySlotActions";
 import type { InventoryArea } from "./game/inventory/inventorySlotActions";
@@ -705,6 +707,9 @@ export default function GameScene() {
           directionalLightRef={directionalLightRef}
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
+        <DoorBlock position={[-3, 2, 4]} />
+        <StairBlock texturePath={assetPath("/textures/world/wood-planks.svg")} position={[1, 1.5, 4]} />
+        <StairBlock texturePath={assetPath("/textures/world/cobblestone.svg")} position={[3, 1.5, 4]} />
         <WorldDropOriginSync originRef={worldDropOriginRef} />
         <DroppedBlockItems
           items={droppedItems}

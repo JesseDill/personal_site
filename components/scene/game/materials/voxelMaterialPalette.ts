@@ -64,6 +64,24 @@ export const voxelMaterialPalette = {
     uiColor: "#8e6438",
     roughness: 0.95,
   },
+  glass: {
+    textures: { all: assetPath("/textures/world/glass.svg") },
+    uiColor: "#c8ddf0",
+    transparent: true,
+    alphaTest: 0.1,
+    roughness: 0.15,
+    metalness: 0.1,
+  },
+  woodPlanks: {
+    textures: { all: assetPath("/textures/world/wood-planks.svg") },
+    uiColor: "#b8945f",
+    roughness: 0.95,
+  },
+  cobblestone: {
+    textures: { all: assetPath("/textures/world/cobblestone.svg") },
+    uiColor: "#7a7a7a",
+    roughness: 1,
+  },
   leaves: {
     textures: { all: assetPath("/textures/world/leaves.svg") },
     uiColor: "#4d7940",

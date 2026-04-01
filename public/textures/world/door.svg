@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 32" shape-rendering="crispEdges">
+  <defs>
+    <mask id="doorPeepholes">
+      <rect width="16" height="32" fill="white" />
+      <rect x="3" y="8" width="4" height="3" fill="black" />
+      <rect x="9" y="8" width="4" height="3" fill="black" />
+    </mask>
+  </defs>
+  <g mask="url(#doorPeepholes)">
+    <rect width="16" height="32" fill="#6b4423" />
+    <rect x="1" y="1" width="14" height="2" fill="#8b5a2b" />
+    <rect x="1" y="29" width="14" height="2" fill="#4a2f18" />
+    <rect x="0" y="0" width="2" height="32" fill="#5c381c" />
+    <rect x="14" y="0" width="2" height="32" fill="#5c381c" />
+    <rect x="2" y="4" width="12" height="1" fill="#7a4a28" />
+    <rect x="2" y="14" width="12" height="1" fill="#6d4224" />
+    <rect x="2" y="24" width="12" height="1" fill="#5a361c" />
+  </g>
+</svg>
