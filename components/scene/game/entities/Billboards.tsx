@@ -10,6 +10,8 @@ import {
 } from "../config/introBillboardCopy";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
 
+const ENABLE_TEXTURE_READBACK_WARMUP = true;
+
 export function BillboardSocialSign({
   label,
   href,
@@ -28,6 +30,40 @@ export function BillboardSocialSign({
 
   useEffect(() => {
     configurePixelTexture(texture);
+
+    const image = texture.image as
+      | {
+          currentSrc?: string;
+          src?: string;
+          width?: number;
+          height?: number;
+          naturalWidth?: number;
+          naturalHeight?: number;
+        }
+      | undefined;
+
+    if (
+      ENABLE_TEXTURE_READBACK_WARMUP &&
+      typeof document !== "undefined" &&
+      image &&
+      typeof image.width === "number" &&
+      typeof image.height === "number" &&
+      image.width > 0 &&
+      image.height > 0
+    ) {
+      const debugCanvas = document.createElement("canvas");
+      debugCanvas.width = image.width;
+      debugCanvas.height = image.height;
+      const debugContext = debugCanvas.getContext("2d", { willReadFrequently: true });
+      if (debugContext) {
+        try {
+          debugContext.drawImage(texture.image as CanvasImageSource, 0, 0);
+          debugContext.getImageData(0, 0, debugCanvas.width, debugCanvas.height);
+        } catch {
+          // Ignore readback failures during Safari texture warm-up.
+        }
+      }
+    }
   }, [texture]);
 
   return (

@@ -85,6 +85,9 @@ type WorldDropOrigin = {
   driftBase: [number, number];
 };
 
+const ENABLE_SCENE_SIZE_STABILIZATION = true;
+const ENABLE_POST_MOUNT_INVALIDATE = true;
+
 function WorldDropOriginSync({ originRef }: { originRef: React.MutableRefObject<WorldDropOrigin | null> }) {
   const { camera } = useThree();
   useFrame(() => {
@@ -106,6 +109,41 @@ function WorldDropOriginSync({ originRef }: { originRef: React.MutableRefObject<
       driftBase: [fwd.x * 0.9, fwd.z * 0.9],
     };
   });
+  return null;
+}
+
+function SceneRenderStabilizer({
+  socialPositions,
+}: {
+  socialPositions: Record<"github" | "googleScholar" | "linkedin", [number, number, number]>;
+}) {
+  const { gl, camera, size, invalidate } = useThree();
+
+  useEffect(() => {
+    let rafId = 0;
+    if (ENABLE_POST_MOUNT_INVALIDATE) {
+      rafId = window.requestAnimationFrame(() => {
+        invalidate();
+      });
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (ENABLE_SCENE_SIZE_STABILIZATION) {
+      resizeObserver = new ResizeObserver(() => {
+        invalidate();
+      });
+      resizeObserver.observe(gl.domElement);
+      if (gl.domElement.parentElement) {
+        resizeObserver.observe(gl.domElement.parentElement);
+      }
+    }
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      resizeObserver?.disconnect();
+    };
+  }, [camera, gl, invalidate, size, socialPositions]);
+
   return null;
 }
 
@@ -645,6 +683,7 @@ export default function GameScene() {
           worldCanvasElRef.current = gl.domElement as HTMLCanvasElement;
         }}
       >
+        <SceneRenderStabilizer socialPositions={spawnSocialPositions} />
         <ambientLight ref={ambientLightRef} intensity={worldSky.lighting.dayAmbient} />
         <hemisphereLight
           ref={hemisphereLightRef}
