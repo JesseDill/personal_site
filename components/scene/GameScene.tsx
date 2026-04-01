@@ -39,6 +39,8 @@ import type { BreakableTerrainHit, DroppedBlockItem, InventorySlot } from "./gam
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
 import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks";
 import { DoorBlock } from "./game/world/DoorBlock";
+import { FenceBlock } from "./game/world/FenceBlock";
+import { SlabBlock } from "./game/world/SlabBlock";
 import { StairBlock } from "./game/world/StairBlock";
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { applyInventorySlotClick, tryAddOneItem } from "./game/inventory/inventorySlotActions";
@@ -710,6 +712,11 @@ export default function GameScene() {
         <DoorBlock position={[-3, 2, 4]} />
         <StairBlock texturePath={assetPath("/textures/world/wood-planks.svg")} position={[1, 1.5, 4]} />
         <StairBlock texturePath={assetPath("/textures/world/cobblestone.svg")} position={[3, 1.5, 4]} />
+        <SlabBlock texturePath={assetPath("/textures/world/wood-planks.svg")} position={[0, 1.25, 3]} />
+        <SlabBlock texturePath={assetPath("/textures/world/cobblestone.svg")} position={[2, 1.25, 3]} />
+        <FenceBlock position={[-3, 1.5, 3]} connectEast />
+        <FenceBlock position={[-2, 1.5, 3]} connectEast connectWest />
+        <FenceBlock position={[-1, 1.5, 3]} connectWest />
         <WorldDropOriginSync originRef={worldDropOriginRef} />
         <DroppedBlockItems
           items={droppedItems}
