@@ -3,15 +3,19 @@
 import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import type { WorldMaterial } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
 
 type DoorBlockProps = {
   position: [number, number, number];
+  fixturePrimaryId: string;
+  terrainMaterial: Exclude<WorldMaterial, "cloud">;
+  breakPosition: [number, number, number];
 };
 
 /** Thin 2-block-tall door with alpha-tested peepholes (see `door.svg`). */
-export function DoorBlock({ position }: DoorBlockProps) {
+export function DoorBlock({ position, fixturePrimaryId, terrainMaterial, breakPosition }: DoorBlockProps) {
   const texture = useTexture(assetPath("/textures/world/door.svg")) as THREE.Texture;
 
   useEffect(() => {
@@ -37,8 +41,17 @@ export function DoorBlock({ position }: DoorBlockProps) {
     };
   }, [material]);
 
+  const hitUserData = useMemo(
+    () => ({
+      terrainMaterial,
+      fixturePrimaryId,
+      fixtureBreakPosition: breakPosition,
+    }),
+    [terrainMaterial, fixturePrimaryId, breakPosition],
+  );
+
   return (
-    <mesh castShadow receiveShadow position={position} material={material}>
+    <mesh castShadow receiveShadow position={position} material={material} userData={hitUserData}>
       <boxGeometry args={[1, 2, 0.1875]} />
     </mesh>
   );

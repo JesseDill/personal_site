@@ -1,26 +1,13 @@
 import { worldBlocks } from "@/data/world";
-import type { SolidSegment } from "../types";
 import { getTerrainBlockKey } from "./blockKeys";
 import { buildSolidColumnsFromBlocks } from "./solidColumns";
+import { getAllShowcaseFixturePhysicsSegments } from "./fixtureDefinitions";
 
 export const worldTerrainBlockKeys = new Set(worldBlocks.map((block) => getTerrainBlockKey(block.position)));
 
 export const worldSolidColumns = buildSolidColumnsFromBlocks(worldBlocks);
 
-/** Collision for meshes not in `worldBlocks` (must match fixture meshes in GameScene). */
-const fixtureSolidSegments: SolidSegment[] = [
-  { bottom: 1.0, top: 2.0, cellX: -3, cellZ: 4, blockKey: "-3:1.5:4" },
-  { bottom: 2.0, top: 3.0, cellX: -3, cellZ: 4, blockKey: "-3:2.5:4" },
-  { bottom: 1.0, top: 1.5, cellX: 1, cellZ: 4, blockKey: "1:1.25:4" },
-  { bottom: 1.0, top: 1.5, cellX: 3, cellZ: 4, blockKey: "3:1.25:4" },
-  { bottom: 1.0, top: 1.5, cellX: 0, cellZ: 3, blockKey: "0:1.25:3" },
-  { bottom: 1.0, top: 1.5, cellX: 2, cellZ: 3, blockKey: "2:1.25:3" },
-  { bottom: 1.0, top: 2.0, cellX: -3, cellZ: 3, blockKey: "-3:1.5:3" },
-  { bottom: 1.0, top: 2.0, cellX: -2, cellZ: 3, blockKey: "-2:1.5:3" },
-  { bottom: 1.0, top: 2.0, cellX: -1, cellZ: 3, blockKey: "-1:1.5:3" },
-];
-
-for (const seg of fixtureSolidSegments) {
+for (const seg of getAllShowcaseFixturePhysicsSegments()) {
   const key = `${seg.cellX}:${seg.cellZ}`;
   const col = worldSolidColumns.get(key) ?? [];
   col.push(seg);

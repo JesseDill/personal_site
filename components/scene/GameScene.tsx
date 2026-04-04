@@ -37,6 +37,7 @@ import { useTerrainOccupancy } from "./game/state/useTerrainOccupancy";
 import { SkySystem } from "./game/sky/SkySystem";
 import type { BreakableTerrainHit, DroppedBlockItem, InventorySlot } from "./game/types";
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
+import { getExpandedRemovalKeysForBreak } from "./game/terrain/fixtureDefinitions";
 import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks";
 import { DoorBlock } from "./game/world/DoorBlock";
 import { FenceBlock } from "./game/world/FenceBlock";
@@ -350,6 +351,38 @@ export default function GameScene() {
 
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
     if (unbreakableTerrainMaterials.has(block.terrainMaterial)) return;
+
+    const fixtureRemovalKeys = getExpandedRemovalKeysForBreak(block.blockKey);
+    if (fixtureRemovalKeys) {
+      setRemovedTerrainBlockKeys((current) => {
+        const next = new Set(current);
+        for (const key of fixtureRemovalKeys) {
+          next.add(key);
+        }
+        return next;
+      });
+
+      const droppedMaterial = block.terrainMaterial === "woodPlanks" ? "wood" : null;
+      if (droppedMaterial) {
+        setDroppedItems((current) => [
+          ...current,
+          (() => {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.9 + Math.random() * 0.45;
+
+            return {
+              id: `${block.blockKey}-${current.length}-${Date.now()}`,
+              material: droppedMaterial,
+              blockPosition: block.blockPosition,
+              spawnedAt: performance.now() / 1000,
+              phase: Math.random() * Math.PI * 2,
+              drift: [Math.cos(angle) * speed, Math.sin(angle) * speed] as [number, number],
+            };
+          })(),
+        ]);
+      }
+      return;
+    }
 
     if (placedTerrainBlocksRef.current.some((entry) => getTerrainBlockKey(entry.position) === block.blockKey)) {
       setPlacedTerrainBlocks((current) => current.filter((entry) => getTerrainBlockKey(entry.position) !== block.blockKey));
@@ -709,14 +742,78 @@ export default function GameScene() {
           directionalLightRef={directionalLightRef}
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
-        <DoorBlock position={[-3, 2, 4]} />
-        <StairBlock texturePath={assetPath("/textures/world/wood-planks.svg")} position={[1, 1.5, 4]} />
-        <StairBlock texturePath={assetPath("/textures/world/cobblestone.svg")} position={[3, 1.5, 4]} />
-        <SlabBlock texturePath={assetPath("/textures/world/wood-planks.svg")} position={[0, 1.25, 3]} />
-        <SlabBlock texturePath={assetPath("/textures/world/cobblestone.svg")} position={[2, 1.25, 3]} />
-        <FenceBlock position={[-3, 1.5, 3]} connectEast />
-        <FenceBlock position={[-2, 1.5, 3]} connectEast connectWest />
-        <FenceBlock position={[-1, 1.5, 3]} connectWest />
+        {!removedTerrainBlockKeys.has("fx:door:-3:4") ? (
+          <DoorBlock
+            position={[-3, 2, 4]}
+            fixturePrimaryId="fx:door:-3:4"
+            terrainMaterial="woodPlanks"
+            breakPosition={[-3, 2, 4]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:stair:1:4") ? (
+          <StairBlock
+            texturePath={assetPath("/textures/world/wood-planks.svg")}
+            position={[1, 1.5, 4]}
+            fixturePrimaryId="fx:stair:1:4"
+            terrainMaterial="woodPlanks"
+            breakPosition={[1, 1.5, 4]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:stair:3:4") ? (
+          <StairBlock
+            texturePath={assetPath("/textures/world/cobblestone.svg")}
+            position={[3, 1.5, 4]}
+            fixturePrimaryId="fx:stair:3:4"
+            terrainMaterial="cobblestone"
+            breakPosition={[3, 1.5, 4]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:slab:0:3") ? (
+          <SlabBlock
+            texturePath={assetPath("/textures/world/wood-planks.svg")}
+            position={[0, 1.25, 3]}
+            fixturePrimaryId="fx:slab:0:3"
+            terrainMaterial="woodPlanks"
+            breakPosition={[0, 1.25, 3]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:slab:2:3") ? (
+          <SlabBlock
+            texturePath={assetPath("/textures/world/cobblestone.svg")}
+            position={[2, 1.25, 3]}
+            fixturePrimaryId="fx:slab:2:3"
+            terrainMaterial="cobblestone"
+            breakPosition={[2, 1.25, 3]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:fence:-3:3") ? (
+          <FenceBlock
+            position={[-3, 1.5, 3]}
+            fixturePrimaryId="fx:fence:-3:3"
+            terrainMaterial="woodPlanks"
+            breakPosition={[-3, 1.5, 3]}
+            connectEast
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:fence:-2:3") ? (
+          <FenceBlock
+            position={[-2, 1.5, 3]}
+            fixturePrimaryId="fx:fence:-2:3"
+            terrainMaterial="woodPlanks"
+            breakPosition={[-2, 1.5, 3]}
+            connectEast
+            connectWest
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:fence:-1:3") ? (
+          <FenceBlock
+            position={[-1, 1.5, 3]}
+            fixturePrimaryId="fx:fence:-1:3"
+            terrainMaterial="woodPlanks"
+            breakPosition={[-1, 1.5, 3]}
+            connectWest
+          />
+        ) : null}
         <WorldDropOriginSync originRef={worldDropOriginRef} />
         <DroppedBlockItems
           items={droppedItems}

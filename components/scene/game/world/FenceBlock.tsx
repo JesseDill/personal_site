@@ -3,11 +3,15 @@
 import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import type { WorldMaterial } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
 
 type FenceBlockProps = {
   position: [number, number, number];
+  fixturePrimaryId: string;
+  terrainMaterial: Exclude<WorldMaterial, "cloud">;
+  breakPosition: [number, number, number];
   /** +Z */
   connectNorth?: boolean;
   /** -Z */
@@ -24,6 +28,9 @@ type FenceBlockProps = {
  */
 export function FenceBlock({
   position,
+  fixturePrimaryId,
+  terrainMaterial,
+  breakPosition,
   connectNorth,
   connectSouth,
   connectEast,
@@ -51,8 +58,17 @@ export function FenceBlock({
     };
   }, [material]);
 
+  const hitUserData = useMemo(
+    () => ({
+      terrainMaterial,
+      fixturePrimaryId,
+      fixtureBreakPosition: breakPosition,
+    }),
+    [terrainMaterial, fixturePrimaryId, breakPosition],
+  );
+
   return (
-    <group position={position}>
+    <group position={position} userData={hitUserData}>
       <mesh castShadow receiveShadow material={material}>
         <boxGeometry args={[0.25, 1, 0.25]} />
       </mesh>
