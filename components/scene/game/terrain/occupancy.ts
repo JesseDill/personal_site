@@ -1,18 +1,54 @@
 import type { WorldBlock } from "@/data/world";
-import type { CenterTerrainHit, SolidSegment } from "../types";
+import type { CenterTerrainHit, PlacedFixture, SolidSegment } from "../types";
 import { getTerrainBlockKey } from "./blockKeys";
 import { buildSolidColumnsFromBlocks } from "./solidColumns";
+import { showcaseFixtures } from "./fixtureDefinitions";
 import { worldTerrainBlockKeys } from "./worldTerrainIndex";
 
 export type TerrainOccupancySnapshot = {
   removedKeys: ReadonlySet<string>;
   placedBlocksByKey: ReadonlyMap<string, WorldBlock>;
   placedSolidColumns: ReadonlyMap<string, SolidSegment[]>;
+  /** Dynamic placed fixtures (slab/stair/fence/door) merged into support / collision. */
+  placedFixtureSolidColumns: ReadonlyMap<string, SolidSegment[]>;
+  /** Segment blockKeys for active (non-removed) fixtures — used for placement overlap checks. */
+  activeFixtureBlockKeys: ReadonlySet<string>;
 };
+
+function buildPlacedFixtureSolidColumns(fixtures: PlacedFixture[]): Map<string, SolidSegment[]> {
+  const columns = new Map<string, SolidSegment[]>();
+  for (const f of fixtures) {
+    for (const seg of f.physicsSegments) {
+      const key = `${seg.cellX}:${seg.cellZ}`;
+      const list = columns.get(key) ?? [];
+      list.push(seg);
+      columns.set(key, list);
+    }
+  }
+  return columns;
+}
+
+function computeActiveFixtureBlockKeys(removedKeys: Set<string>, placedFixtures: PlacedFixture[]): Set<string> {
+  const keys = new Set<string>();
+  for (const f of showcaseFixtures) {
+    if (removedKeys.has(f.primaryId)) continue;
+    for (const s of f.physicsSegments) {
+      keys.add(s.blockKey);
+    }
+  }
+  for (const f of placedFixtures) {
+    if (removedKeys.has(f.primaryId)) continue;
+    for (const s of f.physicsSegments) {
+      keys.add(s.blockKey);
+    }
+  }
+  return keys;
+}
 
 export function createTerrainOccupancySnapshot(
   removedKeys: Set<string>,
   placedBlocks: WorldBlock[],
+  placedFixtures: PlacedFixture[],
 ): TerrainOccupancySnapshot {
   const placedBlocksByKey = new Map<string, WorldBlock>();
   for (const block of placedBlocks) {
@@ -23,6 +59,8 @@ export function createTerrainOccupancySnapshot(
     removedKeys,
     placedBlocksByKey,
     placedSolidColumns: buildSolidColumnsFromBlocks(placedBlocks),
+    placedFixtureSolidColumns: buildPlacedFixtureSolidColumns(placedFixtures),
+    activeFixtureBlockKeys: computeActiveFixtureBlockKeys(removedKeys, placedFixtures),
   };
 }
 
@@ -37,7 +75,11 @@ export function getMergedSolidSegmentsForCell(
   cellZ: number,
 ): SolidSegment[] {
   const key = getXZCellKey(cellX, cellZ);
-  return [...(baseColumns.get(key) ?? []), ...(snapshot.placedSolidColumns.get(key) ?? [])];
+  return [
+    ...(baseColumns.get(key) ?? []),
+    ...(snapshot.placedSolidColumns.get(key) ?? []),
+    ...(snapshot.placedFixtureSolidColumns.get(key) ?? []),
+  ];
 }
 
 /** Matches legacy raycast: removed from world and not replaced by a placed block at the same key. */
@@ -48,8 +90,16 @@ export function isTerrainRayHitSuppressed(snapshot: TerrainOccupancySnapshot, bl
 export function isTerrainBlockKeyOccupied(snapshot: TerrainOccupancySnapshot, blockKey: string) {
   return (
     snapshot.placedBlocksByKey.has(blockKey) ||
-    (worldTerrainBlockKeys.has(blockKey) && !snapshot.removedKeys.has(blockKey))
+    (worldTerrainBlockKeys.has(blockKey) && !snapshot.removedKeys.has(blockKey)) ||
+    snapshot.activeFixtureBlockKeys.has(blockKey)
   );
+}
+
+export function areFixtureSegmentsPlaceable(snapshot: TerrainOccupancySnapshot, segments: SolidSegment[]): boolean {
+  for (const seg of segments) {
+    if (isTerrainBlockKeyOccupied(snapshot, seg.blockKey)) return false;
+  }
+  return true;
 }
 
 /**

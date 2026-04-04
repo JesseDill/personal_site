@@ -3,10 +3,123 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { collectedInventoryConfig } from "../config/inventory";
 import { useHotbarPreviewTextures } from "../hooks/useHotbarPreviewTextures";
 import { armRenderFlags } from "../materials/armMaterials";
 import { useArmTextures } from "../materials/useArmTextures";
-import type { DroppedBlockItem } from "../types";
+import type { InventoryMaterial } from "../types";
+
+function HeldItemMesh({
+  material,
+  faceTexturesByMaterial,
+}: {
+  material: InventoryMaterial;
+  faceTexturesByMaterial: Record<InventoryMaterial, THREE.Texture[]>;
+}) {
+  const cfg = collectedInventoryConfig[material];
+  const faceTextures = faceTexturesByMaterial[material];
+  const primaryMap = faceTextures[0];
+
+  const held_block_position: [number, number, number] = [0.05, -0.15, 0];
+  const held_block_rotation: [number, number, number] = [0.8, 1.1, 0.3];
+  const held_block_scale = 0.72;
+
+  if (cfg.renderKind === "voxelCube") {
+    return (
+      <mesh
+        frustumCulled={false}
+        position={held_block_position}
+        rotation={held_block_rotation}
+        scale={held_block_scale}
+        renderOrder={6}
+      >
+        <boxGeometry args={[1, 1, 1]} />
+        {faceTextures.map((texture, index) => (
+          <meshBasicMaterial
+            key={`arm-preview-${material}-${index}-${texture.uuid}`}
+            attach={`material-${index}`}
+            map={texture}
+            color="#ffffff"
+            depthTest
+            depthWrite
+            toneMapped={false}
+          />
+        ))}
+      </mesh>
+    );
+  }
+
+  const commonMat = (
+    <meshBasicMaterial
+      map={primaryMap}
+      color="#ffffff"
+      depthTest
+      depthWrite
+      toneMapped={false}
+      transparent={cfg.renderKind === "door"}
+      alphaTest={cfg.renderKind === "door" ? 0.5 : undefined}
+      side={cfg.renderKind === "door" ? THREE.DoubleSide : THREE.FrontSide}
+    />
+  );
+
+  if (cfg.renderKind === "slab") {
+    return (
+      <group position={held_block_position} rotation={held_block_rotation} scale={held_block_scale * 0.95} renderOrder={6}>
+        <mesh frustumCulled={false}>
+          <boxGeometry args={[1, 0.5, 1]} />
+          {commonMat}
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cfg.renderKind === "stair") {
+    return (
+      <group position={held_block_position} rotation={held_block_rotation} scale={held_block_scale * 0.92} renderOrder={6}>
+        <mesh frustumCulled={false} position={[0, -0.25, 0]}>
+          <boxGeometry args={[1, 0.5, 1]} />
+          {commonMat}
+        </mesh>
+        <mesh frustumCulled={false} position={[0, 0.25, -0.25]}>
+          <boxGeometry args={[1, 0.5, 0.5]} />
+          {commonMat}
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cfg.renderKind === "fence") {
+    return (
+      <group position={held_block_position} rotation={held_block_rotation} scale={held_block_scale * 0.85} renderOrder={6}>
+        <mesh frustumCulled={false}>
+          <boxGeometry args={[0.25, 1, 0.25]} />
+          {commonMat}
+        </mesh>
+        <mesh frustumCulled={false} position={[0.3125, -0.25, 0]}>
+          <boxGeometry args={[0.375, 0.125, 0.125]} />
+          {commonMat}
+        </mesh>
+        <mesh frustumCulled={false} position={[0.3125, 0.15, 0]}>
+          <boxGeometry args={[0.375, 0.125, 0.125]} />
+          {commonMat}
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cfg.renderKind === "door") {
+    return (
+      <group position={held_block_position} rotation={held_block_rotation} scale={held_block_scale * 0.55} renderOrder={6}>
+        <mesh frustumCulled={false}>
+          <boxGeometry args={[1, 2, 0.1875]} />
+          {commonMat}
+        </mesh>
+      </group>
+    );
+  }
+
+  return null;
+}
 
 export function PlayerArmViewmodel({
   moving,
@@ -25,7 +138,7 @@ export function PlayerArmViewmodel({
   placeSwingTick: number;
   swingHeld: boolean;
   onSwingCycle: () => void;
-  heldInventoryMaterial: DroppedBlockItem["material"] | null;
+  heldInventoryMaterial: InventoryMaterial | null;
 }) {
   const armRef = useRef<THREE.Group>(null);
   const bobPhaseRef = useRef(0);
@@ -35,9 +148,6 @@ export function PlayerArmViewmodel({
   const hotbarPreviewTextures = useHotbarPreviewTextures();
   const arm_rotation: [number, number, number] = [-0.55, 0.22, -0.08];
   const arm_position: [number, number, number] = [0.98, -1.14, 0];
-  const held_block_position: [number, number, number] = [0.05, -0.15, 0];
-  const held_block_rotation: [number, number, number] = [0.8, 1.1, 0.3];
-  const held_block_scale = 0.72;
   const swing_duration = 0.22;
 
   const swing_position_delta: [number, number, number] = [-0.1, -0.12, -0.5];
@@ -144,26 +254,7 @@ export function PlayerArmViewmodel({
           ) : null}
         </group>
         {heldInventoryMaterial ? (
-          <mesh
-            frustumCulled={false}
-            position={held_block_position}
-            rotation={held_block_rotation}
-            scale={held_block_scale}
-            renderOrder={6}
-          >
-            <boxGeometry args={[1, 1, 1]} />
-            {hotbarPreviewTextures[heldInventoryMaterial].map((texture, index) => (
-              <meshBasicMaterial
-                key={`arm-preview-${heldInventoryMaterial}-${index}-${texture.uuid}`}
-                attach={`material-${index}`}
-                map={texture}
-                color="#ffffff"
-                depthTest
-                depthWrite
-                toneMapped={false}
-              />
-            ))}
-          </mesh>
+          <HeldItemMesh material={heldInventoryMaterial} faceTexturesByMaterial={hotbarPreviewTextures} />
         ) : null}
       </group>
     </>

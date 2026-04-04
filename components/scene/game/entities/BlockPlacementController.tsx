@@ -5,12 +5,17 @@ import { useCallback, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { worldBounds } from "@/data/world";
 import { terrainImpactConfig } from "../config/particles";
-import type { DroppedBlockItem } from "../types";
+import type { InventoryMaterial } from "../types";
 import { blockIntersectsPlayerCapsule } from "../physics/collisionMath";
 import { getAdjacentPlacementPositionFromHit, isTerrainBlockKeyOccupied } from "../terrain/occupancy";
 import { getTerrainBlockKey } from "../terrain/blockKeys";
 import { getCenterTerrainHit } from "../terrain/raycastTerrain";
 import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
+
+export type PlacementFacingContext = {
+  forwardX: number;
+  forwardZ: number;
+};
 
 export function BlockPlacementController({
   enabled,
@@ -21,9 +26,13 @@ export function BlockPlacementController({
   getOccupancySnapshot,
 }: {
   enabled: boolean;
-  heldInventoryMaterial: DroppedBlockItem["material"] | null;
+  heldInventoryMaterial: InventoryMaterial | null;
   availableCount: number;
-  onPlaceBlock: (material: DroppedBlockItem["material"], blockPosition: [number, number, number]) => void;
+  onPlaceBlock: (
+    material: InventoryMaterial,
+    blockPosition: [number, number, number],
+    facing: PlacementFacingContext,
+  ) => void;
   onPlaceSwing: () => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
 }) {
@@ -55,11 +64,20 @@ export function BlockPlacementController({
       return;
     }
 
-    if (isTerrainBlockKeyOccupied(snapshot, blockKey) || blockIntersectsPlayerCapsule(blockPosition, camera.position)) {
-      return;
+    const isVoxelItem =
+      heldInventoryMaterial === "dirt" ||
+      heldInventoryMaterial === "wood" ||
+      heldInventoryMaterial === "woodPlanks";
+
+    if (isVoxelItem) {
+      if (isTerrainBlockKeyOccupied(snapshot, blockKey) || blockIntersectsPlayerCapsule(blockPosition, camera.position)) {
+        return;
+      }
     }
 
-    onPlaceBlock(heldInventoryMaterial, blockPosition);
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    onPlaceBlock(heldInventoryMaterial, blockPosition, { forwardX: forward.x, forwardZ: forward.z });
     onPlaceSwing();
   }, [availableCount, camera, enabled, getOccupancySnapshot, heldInventoryMaterial, onPlaceBlock, onPlaceSwing, raycaster, scene]);
 

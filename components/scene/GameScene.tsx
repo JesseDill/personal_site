@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
+import type { WorldMaterial } from "@/data/world";
 import { worldBlocks, worldSky } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { healthConfig } from "./game/config/health";
@@ -35,9 +36,15 @@ import { PlayerArmViewmodel } from "./game/player/PlayerArmViewmodel";
 import { PlayerController } from "./game/player/PlayerController";
 import { useTerrainOccupancy } from "./game/state/useTerrainOccupancy";
 import { SkySystem } from "./game/sky/SkySystem";
-import type { BreakableTerrainHit, DroppedBlockItem, InventorySlot } from "./game/types";
+import type { BreakableTerrainHit, DroppedBlockItem, InventoryMaterial, InventorySlot } from "./game/types";
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
-import { getExpandedRemovalKeysForBreak } from "./game/terrain/fixtureDefinitions";
+import {
+  getFixtureDropMaterial,
+  resolveFixtureRemovalKeys,
+} from "./game/terrain/fixtureDefinitions";
+import { createPlacedFixture, rotationYFromCameraForward } from "./game/terrain/fixturePlacement";
+import { fenceConnectionsAt } from "./game/terrain/fenceConnections";
+import { areFixtureSegmentsPlaceable, isTerrainBlockKeyOccupied } from "./game/terrain/occupancy";
 import { composeVisibleTerrainBlocks } from "./game/terrain/visibleTerrainBlocks";
 import { DoorBlock } from "./game/world/DoorBlock";
 import { FenceBlock } from "./game/world/FenceBlock";
@@ -166,7 +173,7 @@ export default function GameScene() {
   const [armSwingHeld, setArmSwingHeld] = useState(false);
   const [terrainImpactTrigger, setTerrainImpactTrigger] = useState(0);
   const [droppedItems, setDroppedItems] = useState<DroppedBlockItem[]>([]);
-  const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<DroppedBlockItem["material"] | null>(null);
+  const [hoveredInventoryMaterial, setHoveredInventoryMaterial] = useState<InventoryMaterial | null>(null);
   const [hasEnteredWorldThisSession, setHasEnteredWorldThisSession] = useState(false);
   const [spawnLookUnlocked, setSpawnLookUnlocked] = useState(false);
   const [spawnCursorScreenPosition, setSpawnCursorScreenPosition] = useState<{ x: number; y: number } | null>(null);
@@ -201,8 +208,13 @@ export default function GameScene() {
     placedTerrainBlocks,
     setPlacedTerrainBlocks,
     placedTerrainBlocksRef,
+    placedFixtures,
+    setPlacedFixtures,
     getOccupancySnapshot,
   } = useTerrainOccupancy();
+
+  const placedFixturesRef = useRef(placedFixtures);
+  placedFixturesRef.current = placedFixtures;
 
   const ambientLightRef = useRef<THREE.AmbientLight>(null);
   const worldCanvasElRef = useRef<HTMLCanvasElement | null>(null);
@@ -349,37 +361,46 @@ export default function GameScene() {
     setPlaceSwingTick((current) => current + 1);
   }, []);
 
+  const pushDroppedItem = useCallback((material: InventoryMaterial, blockPosition: [number, number, number], idPrefix: string) => {
+    setDroppedItems((current) => {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.9 + Math.random() * 0.45;
+      return [
+        ...current,
+        {
+          id: `${idPrefix}-${current.length}-${Date.now()}`,
+          material,
+          blockPosition,
+          spawnedAt: performance.now() / 1000,
+          phase: Math.random() * Math.PI * 2,
+          drift: [Math.cos(angle) * speed, Math.sin(angle) * speed] as [number, number],
+        },
+      ];
+    });
+  }, []);
+
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
     if (unbreakableTerrainMaterials.has(block.terrainMaterial)) return;
 
-    const fixtureRemovalKeys = getExpandedRemovalKeysForBreak(block.blockKey);
+    const fixtureRemovalKeys = resolveFixtureRemovalKeys(block.blockKey, placedFixturesRef.current);
     if (fixtureRemovalKeys) {
-      setRemovedTerrainBlockKeys((current) => {
-        const next = new Set(current);
-        for (const key of fixtureRemovalKeys) {
-          next.add(key);
-        }
-        return next;
-      });
+      const primaryId = fixtureRemovalKeys[0];
+      const dropMaterial = getFixtureDropMaterial(block.blockKey, placedFixturesRef.current);
 
-      const droppedMaterial = block.terrainMaterial === "woodPlanks" ? "wood" : null;
-      if (droppedMaterial) {
-        setDroppedItems((current) => [
-          ...current,
-          (() => {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 0.9 + Math.random() * 0.45;
+      if (primaryId.startsWith("fx:")) {
+        setRemovedTerrainBlockKeys((current) => {
+          const next = new Set(current);
+          for (const key of fixtureRemovalKeys) {
+            next.add(key);
+          }
+          return next;
+        });
+      }
 
-            return {
-              id: `${block.blockKey}-${current.length}-${Date.now()}`,
-              material: droppedMaterial,
-              blockPosition: block.blockPosition,
-              spawnedAt: performance.now() / 1000,
-              phase: Math.random() * Math.PI * 2,
-              drift: [Math.cos(angle) * speed, Math.sin(angle) * speed] as [number, number],
-            };
-          })(),
-        ]);
+      setPlacedFixtures((prev) => prev.filter((p) => p.primaryId !== primaryId));
+
+      if (dropMaterial) {
+        pushDroppedItem(dropMaterial, block.blockPosition, block.blockKey);
       }
       return;
     }
@@ -393,32 +414,19 @@ export default function GameScene() {
       });
     }
 
-    const droppedMaterial =
+    const droppedMaterial: InventoryMaterial | null =
       block.terrainMaterial === "wood"
         ? "wood"
-        : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt"
-          ? "dirt"
-        : null;
+        : block.terrainMaterial === "woodPlanks"
+          ? "woodPlanks"
+          : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt"
+            ? "dirt"
+            : null;
 
     if (droppedMaterial) {
-      setDroppedItems((current) => [
-        ...current,
-        (() => {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 0.9 + Math.random() * 0.45;
-
-          return {
-            id: `${block.blockKey}-${current.length}-${Date.now()}`,
-            material: droppedMaterial,
-            blockPosition: block.blockPosition,
-            spawnedAt: performance.now() / 1000,
-            phase: Math.random() * Math.PI * 2,
-            drift: [Math.cos(angle) * speed, Math.sin(angle) * speed] as [number, number],
-          };
-        })(),
-      ]);
+      pushDroppedItem(droppedMaterial, block.blockPosition, block.blockKey);
     }
-  }, [placedTerrainBlocksRef, setPlacedTerrainBlocks, setRemovedTerrainBlockKeys]);
+  }, [placedTerrainBlocksRef, pushDroppedItem, setPlacedTerrainBlocks, setPlacedFixtures, setRemovedTerrainBlockKeys]);
 
   const spawnDroppedItemsFromStack = useCallback((stack: NonNullable<InventorySlot>) => {
     const origin = worldDropOriginRef.current;
@@ -528,11 +536,8 @@ export default function GameScene() {
     }
   }, [health, spawnDroppedItemsFromStack]);
 
-  const placeTerrainBlock = useCallback(
-    (material: DroppedBlockItem["material"], blockPosition: [number, number, number]) => {
-      const blockKey = getTerrainBlockKey(blockPosition);
-      const worldMaterial = material === "wood" ? "wood" : "dirt";
-
+  const decrementSelectedHotbarStack = useCallback(
+    (material: InventoryMaterial) => {
       setHotbarSlots((slots) => {
         const sel = slots[selectedInventorySlot];
         if (!sel || sel.material !== material || sel.count <= 0) return slots;
@@ -541,13 +546,70 @@ export default function GameScene() {
         next[selectedInventorySlot] = nc <= 0 ? null : { material: sel.material, count: nc };
         return next;
       });
-
-      setPlacedTerrainBlocks((current) => {
-        if (current.some((entry) => getTerrainBlockKey(entry.position) === blockKey)) return current;
-        return [...current, { position: blockPosition, material: worldMaterial, solid: true }];
-      });
     },
-    [selectedInventorySlot, setPlacedTerrainBlocks],
+    [selectedInventorySlot],
+  );
+
+  const placeFromInventory = useCallback(
+    (
+      material: InventoryMaterial,
+      adjacentBlockPosition: [number, number, number],
+      facing: { forwardX: number; forwardZ: number },
+    ) => {
+      const cx = Math.round(adjacentBlockPosition[0]);
+      const cz = Math.round(adjacentBlockPosition[2]);
+      const snapshot = getOccupancySnapshot();
+      const rotationY = rotationYFromCameraForward(facing.forwardX, facing.forwardZ);
+
+      if (material === "dirt" || material === "wood" || material === "woodPlanks") {
+        const blockKey = getTerrainBlockKey(adjacentBlockPosition);
+        if (isTerrainBlockKeyOccupied(snapshot, blockKey)) return;
+
+        const worldMaterial: WorldMaterial =
+          material === "wood" ? "wood" : material === "woodPlanks" ? "woodPlanks" : "dirt";
+
+        decrementSelectedHotbarStack(material);
+
+        setPlacedTerrainBlocks((current) => {
+          if (current.some((entry) => getTerrainBlockKey(entry.position) === blockKey)) return current;
+          return [...current, { position: adjacentBlockPosition, material: worldMaterial, solid: true }];
+        });
+        return;
+      }
+
+      if (material === "woodenSlab") {
+        const fixture = createPlacedFixture("slab", cx, cz, 0);
+        if (!areFixtureSegmentsPlaceable(snapshot, fixture.physicsSegments)) return;
+        decrementSelectedHotbarStack(material);
+        setPlacedFixtures((prev) => [...prev, fixture]);
+        return;
+      }
+
+      if (material === "woodenStair") {
+        const fixture = createPlacedFixture("stair", cx, cz, rotationY);
+        if (!areFixtureSegmentsPlaceable(snapshot, fixture.physicsSegments)) return;
+        decrementSelectedHotbarStack(material);
+        setPlacedFixtures((prev) => [...prev, fixture]);
+        return;
+      }
+
+      if (material === "woodenFence") {
+        const fixture = createPlacedFixture("fence", cx, cz, 0);
+        if (!areFixtureSegmentsPlaceable(snapshot, fixture.physicsSegments)) return;
+        decrementSelectedHotbarStack(material);
+        setPlacedFixtures((prev) => [...prev, fixture]);
+        return;
+      }
+
+      if (material === "woodenDoor") {
+        const fixture = createPlacedFixture("door", cx, cz, rotationY);
+        if (!areFixtureSegmentsPlaceable(snapshot, fixture.physicsSegments)) return;
+        decrementSelectedHotbarStack(material);
+        setPlacedFixtures((prev) => [...prev, fixture]);
+        return;
+      }
+    },
+    [decrementSelectedHotbarStack, getOccupancySnapshot, setPlacedFixtures, setPlacedTerrainBlocks],
   );
 
   useEffect(() => {
@@ -792,7 +854,7 @@ export default function GameScene() {
             fixturePrimaryId="fx:fence:-3:3"
             terrainMaterial="woodPlanks"
             breakPosition={[-3, 1.5, 3]}
-            connectEast
+            {...fenceConnectionsAt(-3, 3, removedTerrainBlockKeys, placedFixtures)}
           />
         ) : null}
         {!removedTerrainBlockKeys.has("fx:fence:-2:3") ? (
@@ -801,8 +863,7 @@ export default function GameScene() {
             fixturePrimaryId="fx:fence:-2:3"
             terrainMaterial="woodPlanks"
             breakPosition={[-2, 1.5, 3]}
-            connectEast
-            connectWest
+            {...fenceConnectionsAt(-2, 3, removedTerrainBlockKeys, placedFixtures)}
           />
         ) : null}
         {!removedTerrainBlockKeys.has("fx:fence:-1:3") ? (
@@ -811,9 +872,63 @@ export default function GameScene() {
             fixturePrimaryId="fx:fence:-1:3"
             terrainMaterial="woodPlanks"
             breakPosition={[-1, 1.5, 3]}
-            connectWest
+            {...fenceConnectionsAt(-1, 3, removedTerrainBlockKeys, placedFixtures)}
           />
         ) : null}
+        {placedFixtures.map((f) => {
+          const cx = Math.round(f.breakPosition[0]);
+          const cz = Math.round(f.breakPosition[2]);
+          if (f.fixtureKind === "slab") {
+            return (
+              <SlabBlock
+                key={f.primaryId}
+                texturePath={f.texturePath}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
+              />
+            );
+          }
+          if (f.fixtureKind === "stair") {
+            return (
+              <StairBlock
+                key={f.primaryId}
+                texturePath={f.texturePath}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
+                rotation={[0, f.rotationY, 0]}
+              />
+            );
+          }
+          if (f.fixtureKind === "fence") {
+            return (
+              <FenceBlock
+                key={f.primaryId}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
+                {...fenceConnectionsAt(cx, cz, removedTerrainBlockKeys, placedFixtures)}
+              />
+            );
+          }
+          if (f.fixtureKind === "door") {
+            return (
+              <DoorBlock
+                key={f.primaryId}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
+                rotation={[0, f.rotationY, 0]}
+              />
+            );
+          }
+          return null;
+        })}
         <WorldDropOriginSync originRef={worldDropOriginRef} />
         <DroppedBlockItems
           items={droppedItems}
@@ -838,7 +953,7 @@ export default function GameScene() {
           enabled={locked && !activePanel}
           heldInventoryMaterial={heldInventoryMaterial}
           availableCount={placementAvailableCount}
-          onPlaceBlock={placeTerrainBlock}
+          onPlaceBlock={placeFromInventory}
           onPlaceSwing={triggerPlacementSwing}
           getOccupancySnapshot={getOccupancySnapshot}
         />

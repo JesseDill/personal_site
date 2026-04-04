@@ -12,10 +12,17 @@ type DoorBlockProps = {
   fixturePrimaryId: string;
   terrainMaterial: Exclude<WorldMaterial, "cloud">;
   breakPosition: [number, number, number];
+  rotation?: [number, number, number];
 };
 
 /** Thin 2-block-tall door with alpha-tested peepholes (see `door.svg`). */
-export function DoorBlock({ position, fixturePrimaryId, terrainMaterial, breakPosition }: DoorBlockProps) {
+export function DoorBlock({
+  position,
+  fixturePrimaryId,
+  terrainMaterial,
+  breakPosition,
+  rotation = [0, 0, 0],
+}: DoorBlockProps) {
   const texture = useTexture(assetPath("/textures/world/door.svg")) as THREE.Texture;
 
   useEffect(() => {
@@ -51,8 +58,10 @@ export function DoorBlock({ position, fixturePrimaryId, terrainMaterial, breakPo
   );
 
   return (
-    <mesh castShadow receiveShadow position={position} material={material} userData={hitUserData}>
-      <boxGeometry args={[1, 2, 0.1875]} />
-    </mesh>
+    <group position={position} rotation={rotation} userData={hitUserData}>
+      <mesh castShadow receiveShadow material={material}>
+        <boxGeometry args={[1, 2, 0.1875]} />
+      </mesh>
+    </group>
   );
 }

@@ -1,28 +1,31 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import * as THREE from "three";
-import { assetPath } from "@/lib/assetPrefix";
+import { collectedInventoryConfig } from "../config/inventory";
 import type { DroppedBlockItem } from "../types";
 import { cubeFaceOrder } from "../materials/types";
 import { faceTexturePaths } from "../materials/voxelMaterialPalette";
 import { useVoxelTextures } from "../materials/useVoxelTextures";
 import { getHighestSupportBelowFeet } from "../physics/playerSupport";
 import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
+import { assetPath } from "@/lib/assetPrefix";
 
-function DroppedBlockItemMesh({
+function DroppedItemPhysics({
   item,
-  faceTextures,
+  children,
   canCollect,
   onCollect,
   getOccupancySnapshot,
+  halfExtentsY,
 }: {
   item: DroppedBlockItem;
-  faceTextures: THREE.Texture[];
+  children: ReactNode;
   canCollect: boolean;
   onCollect: (item: DroppedBlockItem) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
+  halfExtentsY?: number;
 }) {
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
@@ -33,7 +36,7 @@ function DroppedBlockItemMesh({
   const horizontalVelocityRef = useRef(new THREE.Vector2(item.drift[0], item.drift[1]));
   const verticalVelocityRef = useRef(1.8);
   const groundedRef = useRef(false);
-  const itemHalfSize = 0.17;
+  const itemHalfSize = halfExtentsY ?? 0.17;
   const itemGravity = 9.8;
   const bounceDamping = 0.22;
   const airDrag = 0.92;
@@ -82,7 +85,7 @@ function DroppedBlockItemMesh({
       return;
     }
 
-    const pickupDistance = groundedRef.current ? 0.7 : 0.7;
+    const pickupDistance = 0.7;
     const horizontalDistance = Math.hypot(
       groupRef.current.position.x - camera.position.x,
       groupRef.current.position.z - camera.position.z,
@@ -94,8 +97,37 @@ function DroppedBlockItemMesh({
     }
   });
 
-  return (
-    <group ref={groupRef}>
+  return <group ref={groupRef}>{children}</group>;
+}
+
+function DroppedItemVisual({
+  item,
+  faceTextures,
+  plankTexture,
+  doorTexture,
+}: {
+  item: DroppedBlockItem;
+  faceTextures: THREE.Texture[];
+  plankTexture: THREE.Texture;
+  doorTexture: THREE.Texture;
+}) {
+  const cfg = collectedInventoryConfig[item.material];
+  const primary = plankTexture;
+
+  const matStd = (map: THREE.Texture, door = false) => (
+    <meshStandardMaterial
+      map={map}
+      color="#ffffff"
+      roughness={0.92}
+      metalness={0}
+      transparent={door}
+      alphaTest={door ? 0.5 : undefined}
+      side={door ? THREE.DoubleSide : THREE.FrontSide}
+    />
+  );
+
+  if (cfg.renderKind === "voxelCube") {
+    return (
       <mesh castShadow receiveShadow>
         <boxGeometry args={[0.34, 0.34, 0.34]} />
         {faceTextures.map((texture, index) => (
@@ -109,8 +141,62 @@ function DroppedBlockItemMesh({
           />
         ))}
       </mesh>
-    </group>
-  );
+    );
+  }
+
+  if (cfg.renderKind === "slab") {
+    return (
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[0.34, 0.17, 0.34]} />
+        {matStd(primary)}
+      </mesh>
+    );
+  }
+
+  if (cfg.renderKind === "stair") {
+    return (
+      <group>
+        <mesh castShadow receiveShadow position={[0, -0.085, 0]}>
+          <boxGeometry args={[0.34, 0.17, 0.34]} />
+          {matStd(primary)}
+        </mesh>
+        <mesh castShadow receiveShadow position={[0, 0.085, -0.085]}>
+          <boxGeometry args={[0.34, 0.17, 0.17]} />
+          {matStd(primary)}
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cfg.renderKind === "fence") {
+    return (
+      <group>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[0.085, 0.34, 0.085]} />
+          {matStd(primary)}
+        </mesh>
+        <mesh castShadow receiveShadow position={[0.106, -0.085, 0]}>
+          <boxGeometry args={[0.128, 0.043, 0.043]} />
+          {matStd(primary)}
+        </mesh>
+        <mesh castShadow receiveShadow position={[0.106, 0.051, 0]}>
+          <boxGeometry args={[0.128, 0.043, 0.043]} />
+          {matStd(primary)}
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cfg.renderKind === "door") {
+    return (
+      <mesh castShadow receiveShadow scale={[0.34, 0.34, 0.06]}>
+        <boxGeometry args={[1, 2, 0.1875]} />
+        {matStd(doorTexture, true)}
+      </mesh>
+    );
+  }
+
+  return null;
 }
 
 export function DroppedBlockItems({
@@ -130,22 +216,50 @@ export function DroppedBlockItems({
       ({
         dirt: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/dirt.svg")]),
         wood: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.wood[face]]),
+        woodPlanks: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
+        woodenSlab: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
+        woodenStair: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
+        woodenFence: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
+        woodenDoor: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/door.svg")]),
       }) satisfies Record<DroppedBlockItem["material"], THREE.Texture[]>,
     [texturesByPath],
   );
 
+  const plankTex = texturesByPath[assetPath("/textures/world/wood-planks.svg")];
+  const doorTex = texturesByPath[assetPath("/textures/world/door.svg")];
+
   return (
     <>
-      {items.map((item) => (
-        <DroppedBlockItemMesh
-          key={item.id}
-          item={item}
-          faceTextures={faceTexturesByMaterial[item.material]}
-          canCollect={canCollect}
-          onCollect={onCollect}
-          getOccupancySnapshot={getOccupancySnapshot}
-        />
-      ))}
+      {items.map((item) => {
+        const cfg = collectedInventoryConfig[item.material];
+        const halfY =
+          cfg.renderKind === "slab"
+            ? 0.085
+            : cfg.renderKind === "door"
+              ? 0.34
+              : cfg.renderKind === "stair"
+                ? 0.15
+                : cfg.renderKind === "fence"
+                  ? 0.17
+                  : 0.17;
+        return (
+          <DroppedItemPhysics
+            key={item.id}
+            item={item}
+            canCollect={canCollect}
+            onCollect={onCollect}
+            getOccupancySnapshot={getOccupancySnapshot}
+            halfExtentsY={halfY}
+          >
+            <DroppedItemVisual
+              item={item}
+              faceTextures={faceTexturesByMaterial[item.material]}
+              plankTexture={plankTex}
+              doorTexture={doorTex}
+            />
+          </DroppedItemPhysics>
+        );
+      })}
     </>
   );
 }

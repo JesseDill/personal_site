@@ -135,5 +135,9 @@ export const faceTexturePaths = Object.fromEntries(
 ) as Record<WorldMaterial, Record<CubeFace, string>>;
 
 export const uniqueVoxelTexturePaths = Array.from(
-  new Set(Object.values(faceTexturePaths).flatMap((facePaths) => cubeFaceOrder.map((face) => facePaths[face]))),
+  new Set([
+    ...Object.values(faceTexturePaths).flatMap((facePaths) => cubeFaceOrder.map((face) => facePaths[face])),
+    /** Door mesh (fixtures) — not a voxel face set but needed by `useVoxelTextures` for drops. */
+    assetPath("/textures/world/door.svg"),
+  ]),
 );

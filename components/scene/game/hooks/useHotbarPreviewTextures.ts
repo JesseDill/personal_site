@@ -7,7 +7,7 @@ import {
   hotbarPreviewTexturePaths,
 } from "../config/inventory";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
-import type { DroppedBlockItem } from "../types";
+import type { InventoryMaterial } from "../types";
 
 export function useHotbarPreviewTextures() {
   const textures = useTexture(hotbarPreviewTexturePaths) as THREE.Texture[];
@@ -27,14 +27,19 @@ export function useHotbarPreviewTextures() {
     [textures],
   );
 
-  return useMemo(
-    () =>
-      Object.fromEntries(
-        collectedInventoryMaterials.map((material) => [
-          material,
-          collectedInventoryConfig[material].faceTextures.map((path) => texturesByPath[path]),
-        ]),
-      ) as Record<DroppedBlockItem["material"], THREE.Texture[]>,
-    [texturesByPath],
-  );
+  return useMemo(() => {
+    const out = {} as Record<InventoryMaterial, THREE.Texture[]>;
+    for (const material of collectedInventoryMaterials) {
+      const c = collectedInventoryConfig[material];
+      if (c.renderKind === "voxelCube" && c.faceTextures) {
+        out[material] = c.faceTextures.map((path) => texturesByPath[path]);
+      } else if ("texturePath" in c && c.texturePath) {
+        const t = texturesByPath[c.texturePath];
+        out[material] = Array.from({ length: 6 }, () => t);
+      } else {
+        out[material] = [];
+      }
+    }
+    return out;
+  }, [texturesByPath]);
 }
