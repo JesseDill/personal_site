@@ -23,49 +23,6 @@ export type ShowcaseFixtureDefinition = {
  */
 export const showcaseFixtures: ShowcaseFixtureDefinition[] = [
   {
-    primaryId: "fx:door:-3:4",
-    fixtureKind: "door",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenDoor",
-    breakPosition: [-3, 2, 4],
-    physicsSegments: [
-      { bottom: 1.0, top: 2.0, cellX: -3, cellZ: 4, blockKey: "-3:1.5:4" },
-      { bottom: 2.0, top: 3.0, cellX: -3, cellZ: 4, blockKey: "-3:2.5:4" },
-    ],
-  },
-  {
-    primaryId: "fx:stair:1:4",
-    fixtureKind: "stair",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenStair",
-    breakPosition: [1, 1.5, 4],
-    physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 1, cellZ: 4, blockKey: "1:1.25:4" }],
-  },
-  {
-    primaryId: "fx:stair:3:4",
-    fixtureKind: "stair",
-    terrainMaterial: "cobblestone",
-    dropMaterial: null,
-    breakPosition: [3, 1.5, 4],
-    physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 3, cellZ: 4, blockKey: "3:1.25:4" }],
-  },
-  {
-    primaryId: "fx:slab:0:3",
-    fixtureKind: "slab",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenSlab",
-    breakPosition: [0, 1.25, 3],
-    physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 0, cellZ: 3, blockKey: "0:1.25:3" }],
-  },
-  {
-    primaryId: "fx:slab:2:3",
-    fixtureKind: "slab",
-    terrainMaterial: "cobblestone",
-    dropMaterial: null,
-    breakPosition: [2, 1.25, 3],
-    physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 2, cellZ: 3, blockKey: "2:1.25:3" }],
-  },
-  {
     primaryId: "fx:door:home:5:-9",
     fixtureKind: "door",
     terrainMaterial: "woodPlanks",

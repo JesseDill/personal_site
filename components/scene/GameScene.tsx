@@ -912,15 +912,6 @@ export default function GameScene() {
         <VoxelWorld blocks={visibleTerrainBlocks} />
         <WaterWorld cells={waterCells} />
         <CropOverlay cropKeys={plantedCrops} visibleBlocks={visibleTerrainBlocks} />
-        {!removedTerrainBlockKeys.has("fx:door:-3:4") ? (
-          <DoorBlock
-            position={[-3, 2, 4]}
-            fixturePrimaryId="fx:door:-3:4"
-            terrainMaterial="woodPlanks"
-            breakPosition={[-3, 2, 4]}
-            isOpen={Boolean(showcaseDoorOpen["fx:door:-3:4"])}
-          />
-        ) : null}
         {!removedTerrainBlockKeys.has("fx:door:home:5:-9") ? (
           <DoorBlock
             position={[5, 3, -9]}
@@ -933,24 +924,6 @@ export default function GameScene() {
             isOpen={Boolean(showcaseDoorOpen["fx:door:home:5:-9"])}
           />
         ) : null}
-        {!removedTerrainBlockKeys.has("fx:stair:1:4") ? (
-          <StairBlock
-            texturePath={assetPath("/textures/world/wood-planks.svg")}
-            position={[1, 1.5, 4]}
-            fixturePrimaryId="fx:stair:1:4"
-            terrainMaterial="woodPlanks"
-            breakPosition={[1, 1.5, 4]}
-          />
-        ) : null}
-        {!removedTerrainBlockKeys.has("fx:stair:3:4") ? (
-          <StairBlock
-            texturePath={assetPath("/textures/world/cobblestone.svg")}
-            position={[3, 1.5, 4]}
-            fixturePrimaryId="fx:stair:3:4"
-            terrainMaterial="cobblestone"
-            breakPosition={[3, 1.5, 4]}
-          />
-        ) : null}
         {!removedTerrainBlockKeys.has("fx:stair:home:4:-9") ? (
           <StairBlock
             texturePath={assetPath("/textures/world/cobblestone.svg")}
@@ -959,24 +932,6 @@ export default function GameScene() {
             terrainMaterial="cobblestone"
             breakPosition={[4, 1.5, -9]}
             rotation={[0, (3 * Math.PI) / 2, 0]}
-          />
-        ) : null}
-        {!removedTerrainBlockKeys.has("fx:slab:0:3") ? (
-          <SlabBlock
-            texturePath={assetPath("/textures/world/wood-planks.svg")}
-            position={[0, 1.25, 3]}
-            fixturePrimaryId="fx:slab:0:3"
-            terrainMaterial="woodPlanks"
-            breakPosition={[0, 1.25, 3]}
-          />
-        ) : null}
-        {!removedTerrainBlockKeys.has("fx:slab:2:3") ? (
-          <SlabBlock
-            texturePath={assetPath("/textures/world/cobblestone.svg")}
-            position={[2, 1.25, 3]}
-            fixturePrimaryId="fx:slab:2:3"
-            terrainMaterial="cobblestone"
-            breakPosition={[2, 1.25, 3]}
           />
         ) : null}
         {showcaseFixtures
