@@ -75,6 +75,9 @@ const POINTER_LOCK_LOOK_SPEED = 1;
 const POINTER_LOCK_FROZEN_SPEED = 0;
 const SPAWN_LOOK_UNLOCK_KEYS = new Set(["Space", "KeyW", "KeyA", "KeyS", "KeyD"]);
 
+/** Exit pointer lock when `#fallback` covers at least this fraction of the viewport (scroll away from the game). */
+const FALLBACK_VIEWPORT_EXIT_FRACTION = 0.5;
+
 function ScenePointerLockControls({
   onLock,
   onUnlock,
@@ -744,6 +747,34 @@ export default function GameScene() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activePanel, closeInventory, health, inventoryOpen, locked, openInventory]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!locked || health <= 0 || activePanel) return;
+
+    const el = document.getElementById("fallback");
+    if (!el) return;
+
+    const thresholdSteps = Array.from({ length: 21 }, (_, i) => i / 20);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const vw = Math.max(window.innerWidth, 1);
+        const vh = Math.max(window.innerHeight, 1);
+        const intersectionArea = entry.intersectionRect.width * entry.intersectionRect.height;
+        const overlap = intersectionArea / (vw * vh);
+        if (overlap >= FALLBACK_VIEWPORT_EXIT_FRACTION) {
+          document.exitPointerLock();
+        }
+      },
+      { root: null, threshold: thresholdSteps },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activePanel, health, locked]);
 
   useEffect(() => {
     if (!locked || spawnLookUnlocked || inventoryOpen) return;
