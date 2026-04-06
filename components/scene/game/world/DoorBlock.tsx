@@ -6,7 +6,7 @@ import * as THREE from "three";
 import type { WorldMaterial } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { configurePixelTexture } from "../materials/configurePixelTexture";
-import { getDoorMeshSpec } from "../terrain/doorCollision";
+import { DOOR_Y_MAX, DOOR_Y_MIN, getDoorMeshSpec } from "../terrain/doorCollision";
 
 type DoorBlockProps = {
   position: [number, number, number];
@@ -17,9 +17,12 @@ type DoorBlockProps = {
   rotationY?: number;
   /** Swung open 90° from closed. */
   isOpen?: boolean;
+  /** World-space door slab vertical extent (default 1–3). */
+  doorYMin?: number;
+  doorYMax?: number;
 };
 
-/** Thin 2-block-tall door; mesh bounds match `getDoorSlabBounds` (always inside the door cell). */
+/** Thin door slab; mesh bounds match `getDoorSlabBounds` (always inside the door cell). */
 export function DoorBlock({
   position,
   fixturePrimaryId,
@@ -27,6 +30,8 @@ export function DoorBlock({
   breakPosition,
   rotationY = 0,
   isOpen = false,
+  doorYMin = DOOR_Y_MIN,
+  doorYMax = DOOR_Y_MAX,
 }: DoorBlockProps) {
   const texture = useTexture(assetPath("/textures/world/door.svg")) as THREE.Texture;
 
@@ -54,8 +59,8 @@ export function DoorBlock({
   }, [material]);
 
   const { offset, size } = useMemo(
-    () => getDoorMeshSpec(breakPosition, rotationY, isOpen),
-    [breakPosition, rotationY, isOpen],
+    () => getDoorMeshSpec(breakPosition, rotationY, isOpen, doorYMin, doorYMax),
+    [breakPosition, rotationY, isOpen, doorYMin, doorYMax],
   );
 
   const hitUserData = useMemo(

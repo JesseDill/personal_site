@@ -407,16 +407,120 @@ export const wellFenceCornerCells: readonly [number, number][] = [
   [wellRingMaxX, wellRingMaxZ],
 ];
 
-const farmMinX = 8;
-const farmMaxX = 10;
-const farmMinZ = -2;
-const farmMaxZ = 0;
+/**
+ * 5×4 village home (90° from original 4×5 spec): deeper toward -Z near farm; door on min-X (west) face;
+ * stair one block outside west at (4,-9); windows on length-5 minZ/maxZ edges.
+ */
+export const homeMinX = 5;
+export const homeMaxX = 9;
+export const homeMinZ = -10;
+export const homeMaxZ = -7;
 
-const farmCellKeys = new Set<string>();
-for (let x = farmMinX; x <= farmMaxX; x += 1) {
-  for (let z = farmMinZ; z <= farmMaxZ; z += 1) {
-    farmCellKeys.add(`${x}:${z}`);
+/** Middle of length-4 edge along Z (door column). */
+export const homeDoorX = homeMinX;
+export const homeDoorZ = homeMinZ + 1;
+export const homeStairX = homeMinX - 1;
+export const homeStairZ = homeDoorZ;
+
+const homeFloorY = 0.5;
+const homeBaseY = -0.5;
+const homeWallY1 = 1.5;
+const homeWallY2 = 2.5;
+const homeWallY3 = 3.5;
+const homeRoofY = 4.5;
+const homeRidgeY = 5.5;
+/** Middle of length-5 sides (minZ / maxZ edges); window 2 blocks above floor center (internal 2.5). */
+const homeWindowX = homeMinX + 2;
+const homeWindowY = homeWallY2;
+
+function isHomeFootprint(x: number, z: number) {
+  return x >= homeMinX && x <= homeMaxX && z >= homeMinZ && z <= homeMaxZ;
+}
+
+function isHomeCorner(x: number, z: number) {
+  return (
+    isHomeFootprint(x, z) &&
+    (x === homeMinX || x === homeMaxX) &&
+    (z === homeMinZ || z === homeMaxZ)
+  );
+}
+
+function isHomePerimeter(x: number, z: number) {
+  if (!isHomeFootprint(x, z)) return false;
+  return x === homeMinX || x === homeMaxX || z === homeMinZ || z === homeMaxZ;
+}
+
+function isHomeDoorCell(x: number, z: number) {
+  return x === homeDoorX && z === homeDoorZ;
+}
+
+function addVillageHomeAboveFloor(blocks: WorldBlock[]) {
+  const wallYs = [homeWallY1, homeWallY2, homeWallY3] as const;
+  for (const y of wallYs) {
+    for (let x = homeMinX; x <= homeMaxX; x += 1) {
+      for (let z = homeMinZ; z <= homeMaxZ; z += 1) {
+        if (!isHomePerimeter(x, z)) continue;
+        if (isHomeCorner(x, z)) {
+          blocks.push({ position: [x, y, z], material: "wood", solid: true });
+          continue;
+        }
+        if (isHomeDoorCell(x, z)) continue;
+        if ((z === homeMinZ || z === homeMaxZ) && x === homeWindowX && y === homeWindowY) {
+          blocks.push({ position: [x, y, z], material: "glass", solid: true });
+          continue;
+        }
+        blocks.push({ position: [x, y, z], material: "woodPlanks", solid: true });
+      }
+    }
   }
+
+  for (let x = homeMinX; x <= homeMaxX; x += 1) {
+    for (let z = homeMinZ; z <= homeMaxZ; z += 1) {
+      if (isHomeCorner(x, z)) continue;
+      blocks.push({ position: [x, homeRoofY, z], material: "wood", solid: true });
+    }
+  }
+
+  for (const x of [homeMinX + 1, homeMinX + 2, homeMinX + 3] as const) {
+    for (const z of [homeMinZ + 1, homeMinZ + 2] as const) {
+      blocks.push({ position: [x, homeRidgeY, z], material: "wood", solid: true });
+    }
+  }
+}
+
+/** 7×9 village farm: 7 along X, 9 along Z; raised one block (dirt base + surface). Log perimeter; mid-X water 7 long (interior Z only). */
+const farmMinX = 8;
+const farmMaxX = 14;
+const farmMinZ = -5;
+const farmMaxZ = 3;
+
+const farmWaterX = farmMinX + 3;
+/** Internal Y: dirt support under entire footprint; wood/farmland surface one block above. */
+const farmBaseY = -0.5;
+const farmSurfaceY = 0.5;
+/** Exported world Y for water surface and crop block keys (matches farmSurfaceY + verticalOffset). */
+const farmExportedSurfaceY = farmSurfaceY + 1;
+
+function isFarmFootprint(x: number, z: number) {
+  return x >= farmMinX && x <= farmMaxX && z >= farmMinZ && z <= farmMaxZ;
+}
+
+function isFarmWaterCell(x: number, z: number) {
+  return x === farmWaterX && z > farmMinZ && z < farmMaxZ;
+}
+
+function isFarmPerimeterLog(x: number, z: number) {
+  if (!isFarmFootprint(x, z) || isFarmWaterCell(x, z)) return false;
+  return x === farmMinX || x === farmMaxX || z === farmMinZ || z === farmMaxZ;
+}
+
+function isFarmFarmlandCell(x: number, z: number) {
+  return isFarmFootprint(x, z) && !isFarmWaterCell(x, z) && !isFarmPerimeterLog(x, z);
+}
+
+const farmWaterCellKeys = new Set<string>();
+for (let z = farmMinZ + 1; z <= farmMaxZ - 1; z += 1) {
+  farmWaterCellKeys.add(`${farmWaterX}:${z}`);
 }
 
 function addPerimeterWalls(blocks: WorldBlock[]) {
@@ -463,8 +567,22 @@ function buildWorldBlocks() {
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     for (let z = worldBounds.minZ; z <= worldBounds.maxZ; z += 1) {
       if (waterPoolCellKeys.has(`${x}:${z}`)) continue;
-      if (farmCellKeys.has(`${x}:${z}`)) {
-        blocks.push({ position: [x, -0.5, z], material: "farmland" });
+      if (isHomeFootprint(x, z)) {
+        blocks.push({ position: [x, homeBaseY, z], material: "dirt", solid: true });
+        blocks.push({ position: [x, homeFloorY, z], material: "cobblestone", solid: true });
+        continue;
+      }
+      if (isFarmFootprint(x, z)) {
+        blocks.push({ position: [x, farmBaseY, z], material: "dirt", solid: true });
+        if (farmWaterCellKeys.has(`${x}:${z}`)) continue;
+        if (isFarmPerimeterLog(x, z)) {
+          blocks.push({ position: [x, farmSurfaceY, z], material: "wood", solid: true });
+          continue;
+        }
+        if (isFarmFarmlandCell(x, z)) {
+          blocks.push({ position: [x, farmSurfaceY, z], material: "farmland", solid: true });
+          continue;
+        }
         continue;
       }
       addTerrainColumn(blocks, x, z);
@@ -491,6 +609,8 @@ function buildWorldBlocks() {
   addWellBaseCobble(blocks);
   addWellMidRing(blocks);
   addWellRoof(blocks);
+
+  addVillageHomeAboveFloor(blocks);
 
   // Showcase row in front of spawn (z=4); cubes use instanced voxels — door/stairs mount in GameScene.
   blocks.push({ position: [-1, 0.5, 4], material: "glass", solid: true });
@@ -529,14 +649,18 @@ export const obstacleCells = new Set(
   worldBlocks.filter((block) => block.solid).map((block) => cellKey(block.position[0], block.position[2])),
 );
 
-/** Block keys of farmland cells that start with carrots planted. */
-export const worldAuthoredCrops = new Set<string>([
-  "8:0.5:-2",
-  "9:0.5:-1",
-  "10:0.5:0",
-  "8:0.5:0",
-  "10:0.5:-2",
-]);
+/** Block keys of farmland cells that start with carrots planted (exported world y matches farm surface). */
+export const worldAuthoredCrops = new Set<string>(
+  (() => {
+    const keys: string[] = [];
+    for (let x = farmMinX; x <= farmMaxX; x += 1) {
+      for (let z = farmMinZ; z <= farmMaxZ; z += 1) {
+        if (isFarmFarmlandCell(x, z)) keys.push(`${x}:${farmExportedSurfaceY}:${z}`);
+      }
+    }
+    return keys;
+  })(),
+);
 
 export const worldWaterSources: WaterSource[] = (() => {
   const sources: WaterSource[] = [];
@@ -544,6 +668,9 @@ export const worldWaterSources: WaterSource[] = (() => {
     for (let z = wellWaterMinZ; z <= wellWaterMaxZ; z += 1) {
       sources.push({ position: [x, 0.5, z] });
     }
+  }
+  for (let z = farmMinZ + 1; z <= farmMaxZ - 1; z += 1) {
+    sources.push({ position: [farmWaterX, farmExportedSurfaceY, z] });
   }
   return sources;
 })();

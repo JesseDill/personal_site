@@ -5,8 +5,8 @@ import type { PlacedFixture } from "../types";
 /** Matches `boxGeometry` depth in DoorBlock (thin axis). */
 export const DOOR_THICKNESS = 0.1875;
 
-const DOOR_Y_MIN = 1;
-const DOOR_Y_MAX = 3;
+export const DOOR_Y_MIN = 1;
+export const DOOR_Y_MAX = 3;
 
 export type DoorFacing = "west" | "east" | "south" | "north";
 
@@ -31,7 +31,16 @@ export type DoorSlabBounds = {
   maxZ: number;
 };
 
-function clampXZToCell(cellX: number, cellZ: number, minX: number, maxX: number, minZ: number, maxZ: number): DoorSlabBounds {
+function clampXZToCell(
+  cellX: number,
+  cellZ: number,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+  yMin: number = DOOR_Y_MIN,
+  yMax: number = DOOR_Y_MAX,
+): DoorSlabBounds {
   const cxmin = cellX - 0.5;
   const cxmax = cellX + 0.5;
   const czmin = cellZ - 0.5;
@@ -39,8 +48,8 @@ function clampXZToCell(cellX: number, cellZ: number, minX: number, maxX: number,
   return {
     minX: Math.max(cxmin, Math.min(minX, cxmax)),
     maxX: Math.min(cxmax, Math.max(maxX, cxmin)),
-    minY: DOOR_Y_MIN,
-    maxY: DOOR_Y_MAX,
+    minY: yMin,
+    maxY: yMax,
     minZ: Math.max(czmin, Math.min(minZ, czmax)),
     maxZ: Math.min(czmax, Math.max(maxZ, czmin)),
   };
@@ -48,10 +57,17 @@ function clampXZToCell(cellX: number, cellZ: number, minX: number, maxX: number,
 
 /**
  * Axis-aligned door slab fully inside the 1×1 cell `[cellX ± 0.5] × [cellZ ± 0.5]`.
- * Closed: 1 m wide along one axis, thin along the other (centered).
+ * Closed: full width along one axis; thin along the other, flush to the cell edge (not centered).
  * Open: 1 m wide along the perpendicular axis, thin slab flush to the hinge edge.
  */
-export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: number, isOpen: boolean): DoorSlabBounds {
+export function getDoorSlabBounds(
+  cellX: number,
+  cellZ: number,
+  rotationY: number,
+  isOpen: boolean,
+  yMin: number = DOOR_Y_MIN,
+  yMax: number = DOOR_Y_MAX,
+): DoorSlabBounds {
   const t = DOOR_THICKNESS;
   const cx = cellX;
   const cz = cellZ;
@@ -70,8 +86,8 @@ export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: numbe
     if (!isOpen) {
       minX = hxmin;
       maxX = hxmax;
-      minZ = cz - t / 2;
-      maxZ = cz + t / 2;
+      minZ = hzmin;
+      maxZ = hzmin + t;
     } else {
       minX = hxmin;
       maxX = hxmin + t;
@@ -82,8 +98,8 @@ export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: numbe
     if (!isOpen) {
       minX = hxmin;
       maxX = hxmax;
-      minZ = cz - t / 2;
-      maxZ = cz + t / 2;
+      minZ = hzmax - t;
+      maxZ = hzmax;
     } else {
       minX = hxmax - t;
       maxX = hxmax;
@@ -94,8 +110,8 @@ export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: numbe
     if (!isOpen) {
       minZ = hzmin;
       maxZ = hzmax;
-      minX = cx - t / 2;
-      maxX = cx + t / 2;
+      minX = hxmin;
+      maxX = hxmin + t;
     } else {
       minZ = hzmin;
       maxZ = hzmin + t;
@@ -106,8 +122,8 @@ export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: numbe
     if (!isOpen) {
       minZ = hzmin;
       maxZ = hzmax;
-      minX = cx - t / 2;
-      maxX = cx + t / 2;
+      minX = hxmax - t;
+      maxX = hxmax;
     } else {
       minZ = hzmax - t;
       maxZ = hzmax;
@@ -116,7 +132,7 @@ export function getDoorSlabBounds(cellX: number, cellZ: number, rotationY: numbe
     }
   }
 
-  return clampXZToCell(cellX, cellZ, minX, maxX, minZ, maxZ);
+  return clampXZToCell(cellX, cellZ, minX, maxX, minZ, maxZ, yMin, yMax);
 }
 
 export function computeDoorObstacle(
@@ -124,8 +140,10 @@ export function computeDoorObstacle(
   cellZ: number,
   rotationY: number,
   isOpen: boolean,
+  yMin: number = DOOR_Y_MIN,
+  yMax: number = DOOR_Y_MAX,
 ): DoorObstacle {
-  const b = getDoorSlabBounds(cellX, cellZ, rotationY, isOpen);
+  const b = getDoorSlabBounds(cellX, cellZ, rotationY, isOpen, yMin, yMax);
   return {
     primaryId: "",
     minX: b.minX,
@@ -142,10 +160,12 @@ export function getDoorMeshSpec(
   breakPosition: [number, number, number],
   rotationY: number,
   isOpen: boolean,
+  yMin: number = DOOR_Y_MIN,
+  yMax: number = DOOR_Y_MAX,
 ): { offset: [number, number, number]; size: [number, number, number] } {
   const cellX = Math.round(breakPosition[0]);
   const cellZ = Math.round(breakPosition[2]);
-  const b = getDoorSlabBounds(cellX, cellZ, rotationY, isOpen);
+  const b = getDoorSlabBounds(cellX, cellZ, rotationY, isOpen, yMin, yMax);
   const cx = (b.minX + b.maxX) / 2;
   const cy = (b.minY + b.maxY) / 2;
   const cz = (b.minZ + b.maxZ) / 2;
@@ -168,7 +188,10 @@ export function collectDoorObstacles(
     const cellX = Math.round(f.breakPosition[0]);
     const cellZ = Math.round(f.breakPosition[2]);
     const isOpen = Boolean(showcaseDoorOpen[f.primaryId]);
-    const obs = computeDoorObstacle(cellX, cellZ, 0, isOpen);
+    const rotationY = f.doorRotationY ?? 0;
+    const yMin = f.doorYMin ?? DOOR_Y_MIN;
+    const yMax = f.doorYMax ?? DOOR_Y_MAX;
+    const obs = computeDoorObstacle(cellX, cellZ, rotationY, isOpen, yMin, yMax);
     out.push({ ...obs, primaryId: f.primaryId });
   }
 

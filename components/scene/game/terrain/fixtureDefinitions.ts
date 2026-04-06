@@ -10,6 +10,11 @@ export type ShowcaseFixtureDefinition = {
   dropMaterial: InventoryMaterial | null;
   breakPosition: [number, number, number];
   physicsSegments: SolidSegment[];
+  /** Showcase doors only: Y rotation for collision/mesh (matches DoorBlock). */
+  doorRotationY?: number;
+  /** Showcase doors only: world-space vertical extent (default 1–3). */
+  doorYMin?: number;
+  doorYMax?: number;
 };
 
 /**
@@ -59,6 +64,30 @@ export const showcaseFixtures: ShowcaseFixtureDefinition[] = [
     dropMaterial: null,
     breakPosition: [2, 1.25, 3],
     physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 2, cellZ: 3, blockKey: "2:1.25:3" }],
+  },
+  {
+    primaryId: "fx:door:home:5:-9",
+    fixtureKind: "door",
+    terrainMaterial: "woodPlanks",
+    dropMaterial: "woodenDoor",
+    breakPosition: [5, 3, -9],
+    doorRotationY: 0,
+    doorYMin: 1,
+    doorYMax: 5,
+    physicsSegments: [
+      { bottom: 1.0, top: 2.0, cellX: 5, cellZ: -9, blockKey: "5:1.5:-9" },
+      { bottom: 2.0, top: 3.0, cellX: 5, cellZ: -9, blockKey: "5:2.5:-9" },
+      { bottom: 3.0, top: 4.0, cellX: 5, cellZ: -9, blockKey: "5:3.5:-9" },
+      { bottom: 4.0, top: 5.0, cellX: 5, cellZ: -9, blockKey: "5:4.5:-9" },
+    ],
+  },
+  {
+    primaryId: "fx:stair:home:4:-9",
+    fixtureKind: "stair",
+    terrainMaterial: "cobblestone",
+    dropMaterial: null,
+    breakPosition: [4, 1.5, -9],
+    physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 4, cellZ: -9, blockKey: "4:1.25:-9" }],
   },
   ...wellFenceCornerCells.map(([cellX, cellZ]) => {
     const primaryId = `fx:fence:well:${cellX}:${cellZ}`;

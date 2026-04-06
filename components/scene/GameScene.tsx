@@ -198,7 +198,9 @@ export default function GameScene() {
   const [hotbarSlots, setHotbarSlots] = useState<InventorySlot[]>(() =>
     Array.from({ length: hotbarSlotCount }, () => null),
   );
-  const [showcaseDoorOpen, setShowcaseDoorOpen] = useState<Record<string, boolean>>({});
+  const [showcaseDoorOpen, setShowcaseDoorOpen] = useState<Record<string, boolean>>({
+    "fx:door:home:5:-9": true,
+  });
   const [plantedCrops, setPlantedCrops] = useState(() => new Set(worldAuthoredCrops));
   const plantedCropsRef = useRef(plantedCrops);
   plantedCropsRef.current = plantedCrops;
@@ -919,6 +921,18 @@ export default function GameScene() {
             isOpen={Boolean(showcaseDoorOpen["fx:door:-3:4"])}
           />
         ) : null}
+        {!removedTerrainBlockKeys.has("fx:door:home:5:-9") ? (
+          <DoorBlock
+            position={[5, 3, -9]}
+            fixturePrimaryId="fx:door:home:5:-9"
+            terrainMaterial="woodPlanks"
+            breakPosition={[5, 3, -9]}
+            rotationY={0}
+            doorYMin={1}
+            doorYMax={5}
+            isOpen={Boolean(showcaseDoorOpen["fx:door:home:5:-9"])}
+          />
+        ) : null}
         {!removedTerrainBlockKeys.has("fx:stair:1:4") ? (
           <StairBlock
             texturePath={assetPath("/textures/world/wood-planks.svg")}
@@ -935,6 +949,16 @@ export default function GameScene() {
             fixturePrimaryId="fx:stair:3:4"
             terrainMaterial="cobblestone"
             breakPosition={[3, 1.5, 4]}
+          />
+        ) : null}
+        {!removedTerrainBlockKeys.has("fx:stair:home:4:-9") ? (
+          <StairBlock
+            texturePath={assetPath("/textures/world/cobblestone.svg")}
+            position={[4, 1.5, -9]}
+            fixturePrimaryId="fx:stair:home:4:-9"
+            terrainMaterial="cobblestone"
+            breakPosition={[4, 1.5, -9]}
+            rotation={[0, (3 * Math.PI) / 2, 0]}
           />
         ) : null}
         {!removedTerrainBlockKeys.has("fx:slab:0:3") ? (
