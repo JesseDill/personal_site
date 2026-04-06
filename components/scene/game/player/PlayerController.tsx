@@ -35,6 +35,11 @@ function hasFeetSupport(
   return top >= feetY - 0.01;
 }
 
+const WATER_GRAVITY = 4;
+const WATER_SWIM_UP_SPEED = 4;
+const WATER_MAX_SINK_SPEED = 2;
+const WATER_SPEED_MULTIPLIER = 0.45;
+
 export function PlayerController({
   enabled,
   respawnToken = 0,
@@ -45,6 +50,7 @@ export function PlayerController({
   onFallLand,
   getOccupancySnapshot,
   sprintAllowed = true,
+  isInWater,
 }: {
   enabled: boolean;
   /** Increment from parent to snap the player back to spawn (position, rotation, motion). */
@@ -61,6 +67,8 @@ export function PlayerController({
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
   /** When false, Shift does not increase forward speed (e.g. low hunger). */
   sprintAllowed?: boolean;
+  /** Point-in-water query supplied by the water simulation system. */
+  isInWater?: (x: number, y: number, z: number) => boolean;
 }) {
   const { camera } = useThree();
   const keysRef = useRef<Record<string, boolean>>({});
@@ -180,11 +188,12 @@ export function PlayerController({
     if (keysRef.current.KeyD) movement.add(right);
 
     const wantsToMove = movement.lengthSq() > 0;
+    const feetInWater = isInWater?.(camera.position.x, currentFeetY + 0.1, camera.position.z) ?? false;
     const ctrlHeld = Boolean(keysRef.current.ControlLeft || keysRef.current.ControlRight);
     const shiftHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
-    const sneaking = ctrlHeld && !(shiftHeld && wantsToMove) && groundedRef.current;
+    const sneaking = !feetInWater && ctrlHeld && !(shiftHeld && wantsToMove) && groundedRef.current;
     const sprintHeld = Boolean(keysRef.current.ShiftLeft || keysRef.current.ShiftRight);
-    const forwardSprint = sprintAllowed && sprintHeld && keysRef.current.KeyW;
+    const forwardSprint = !feetInWater && sprintAllowed && sprintHeld && keysRef.current.KeyW;
     const isSprinting = Boolean(wantsToMove && !sneaking && forwardSprint);
 
     if (movingRef.current !== wantsToMove) {
@@ -205,7 +214,9 @@ export function PlayerController({
 
     if (wantsToMove) {
       let moveSpeed = speed;
-      if (sneaking) {
+      if (feetInWater) {
+        moveSpeed = speed * WATER_SPEED_MULTIPLIER;
+      } else if (sneaking) {
         const diagonal =
           (keysRef.current.KeyW || keysRef.current.KeyS) &&
           (keysRef.current.KeyA || keysRef.current.KeyD);
@@ -277,55 +288,101 @@ export function PlayerController({
       }
     }
 
-    if (jumpQueuedRef.current && groundedRef.current) {
-      verticalVelocityRef.current = jumpVelocity;
-      groundedRef.current = false;
-    }
-
-    jumpQueuedRef.current = false;
-    verticalVelocityRef.current -= gravity * delta;
-    const targetFeetY = nextFeetY + verticalVelocityRef.current * delta;
-
-    if (verticalVelocityRef.current > 0) {
-      nextFeetY = resolveUpwardFeetPositionWithCeiling(
-        snapshot,
-        nextX,
-        nextFeetY,
-        targetFeetY,
-        nextZ,
-        activeBodyHeight,
-      );
-      if (nextFeetY < targetFeetY) {
-        verticalVelocityRef.current = 0;
-      }
-      groundedRef.current = false;
-    } else {
-      const supportFeetY = getHighestSupportBelowFeet(
-        snapshot,
-        nextX,
-        nextFeetY + playerCollisionConfig.stepHeight,
-        nextZ,
-      );
-
-      if (targetFeetY <= supportFeetY) {
-        nextFeetY = supportFeetY;
-        verticalVelocityRef.current = 0;
-        groundedRef.current = true;
+    if (feetInWater) {
+      if (keysRef.current.Space) {
+        verticalVelocityRef.current = WATER_SWIM_UP_SPEED;
       } else {
-        nextFeetY = targetFeetY;
-        const snappedSupportY = getHighestSupportBelowFeet(
+        verticalVelocityRef.current -= WATER_GRAVITY * delta;
+        if (verticalVelocityRef.current < -WATER_MAX_SINK_SPEED) {
+          verticalVelocityRef.current = -WATER_MAX_SINK_SPEED;
+        }
+      }
+      jumpQueuedRef.current = false;
+      airbornePeakFeetRef.current = null;
+
+      const targetFeetY = nextFeetY + verticalVelocityRef.current * delta;
+
+      if (verticalVelocityRef.current > 0) {
+        nextFeetY = resolveUpwardFeetPositionWithCeiling(
           snapshot,
           nextX,
-          nextFeetY + playerCollisionConfig.groundSnapDistance,
+          nextFeetY,
+          targetFeetY,
+          nextZ,
+          activeBodyHeight,
+        );
+        if (nextFeetY < targetFeetY) {
+          verticalVelocityRef.current = 0;
+        }
+        groundedRef.current = false;
+      } else {
+        const supportFeetY = getHighestSupportBelowFeet(
+          snapshot,
+          nextX,
+          nextFeetY + playerCollisionConfig.stepHeight,
           nextZ,
         );
 
-        if (snappedSupportY >= nextFeetY && snappedSupportY - nextFeetY <= playerCollisionConfig.groundSnapDistance) {
-          nextFeetY = snappedSupportY;
+        if (targetFeetY <= supportFeetY) {
+          nextFeetY = supportFeetY;
           verticalVelocityRef.current = 0;
           groundedRef.current = true;
         } else {
+          nextFeetY = targetFeetY;
           groundedRef.current = false;
+        }
+      }
+    } else {
+      if (jumpQueuedRef.current && groundedRef.current) {
+        verticalVelocityRef.current = jumpVelocity;
+        groundedRef.current = false;
+      }
+
+      jumpQueuedRef.current = false;
+      verticalVelocityRef.current -= gravity * delta;
+      const targetFeetY = nextFeetY + verticalVelocityRef.current * delta;
+
+      if (verticalVelocityRef.current > 0) {
+        nextFeetY = resolveUpwardFeetPositionWithCeiling(
+          snapshot,
+          nextX,
+          nextFeetY,
+          targetFeetY,
+          nextZ,
+          activeBodyHeight,
+        );
+        if (nextFeetY < targetFeetY) {
+          verticalVelocityRef.current = 0;
+        }
+        groundedRef.current = false;
+      } else {
+        const supportFeetY = getHighestSupportBelowFeet(
+          snapshot,
+          nextX,
+          nextFeetY + playerCollisionConfig.stepHeight,
+          nextZ,
+        );
+
+        if (targetFeetY <= supportFeetY) {
+          nextFeetY = supportFeetY;
+          verticalVelocityRef.current = 0;
+          groundedRef.current = true;
+        } else {
+          nextFeetY = targetFeetY;
+          const snappedSupportY = getHighestSupportBelowFeet(
+            snapshot,
+            nextX,
+            nextFeetY + playerCollisionConfig.groundSnapDistance,
+            nextZ,
+          );
+
+          if (snappedSupportY >= nextFeetY && snappedSupportY - nextFeetY <= playerCollisionConfig.groundSnapDistance) {
+            nextFeetY = snappedSupportY;
+            verticalVelocityRef.current = 0;
+            groundedRef.current = true;
+          } else {
+            groundedRef.current = false;
+          }
         }
       }
     }
@@ -334,7 +391,7 @@ export function PlayerController({
     if (isGroundedAfterPhysics) {
       if (!wasGroundedAtFrameStart) {
         const peak = airbornePeakFeetRef.current;
-        if (peak !== null) {
+        if (peak !== null && !feetInWater) {
           const fallDistance = peak - nextFeetY;
           if (fallDistance > 0.05) {
             onFallLandRef.current?.(fallDistance);
@@ -344,7 +401,7 @@ export function PlayerController({
       } else {
         airbornePeakFeetRef.current = null;
       }
-    } else {
+    } else if (!feetInWater) {
       airbornePeakFeetRef.current = Math.max(airbornePeakFeetRef.current ?? nextFeetY, nextFeetY);
     }
 

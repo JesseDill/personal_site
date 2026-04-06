@@ -72,6 +72,14 @@ export type InventorySlot = {
   count: number;
 } | null;
 
+export type WaterCell = {
+  x: number;
+  y: number;
+  z: number;
+  level: number;
+  isSource: boolean;
+};
+
 export type TerrainBreakOverlayState = {
   blockKey: string;
   blockPosition: [number, number, number];

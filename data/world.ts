@@ -29,6 +29,10 @@ export type WorldBlock = {
   solid?: boolean;
 };
 
+export type WaterSource = {
+  position: [number, number, number];
+};
+
 export type Landmark = {
   id: InteractionId;
   position: [number, number, number];
@@ -337,6 +341,18 @@ function addCloud(blocks: WorldBlock[], x: number, z: number) {
   });
 }
 
+const waterPoolMinX = -9;
+const waterPoolMaxX = -7;
+const waterPoolMinZ = -5;
+const waterPoolMaxZ = -3;
+
+const waterPoolCellKeys = new Set<string>();
+for (let x = waterPoolMinX; x <= waterPoolMaxX; x += 1) {
+  for (let z = waterPoolMinZ; z <= waterPoolMaxZ; z += 1) {
+    waterPoolCellKeys.add(`${x}:${z}`);
+  }
+}
+
 function addPerimeterWalls(blocks: WorldBlock[]) {
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     blocks.push({ position: [x, 0.5, worldBounds.minZ], material: "stoneDark", solid: true });
@@ -380,7 +396,9 @@ function buildWorldBlocks() {
 
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     for (let z = worldBounds.minZ; z <= worldBounds.maxZ; z += 1) {
-      addTerrainColumn(blocks, x, z);
+      if (!waterPoolCellKeys.has(`${x}:${z}`)) {
+        addTerrainColumn(blocks, x, z);
+      }
     }
   }
 
@@ -437,3 +455,13 @@ export const worldBlocks = buildWorldBlocks();
 export const obstacleCells = new Set(
   worldBlocks.filter((block) => block.solid).map((block) => cellKey(block.position[0], block.position[2])),
 );
+
+export const worldWaterSources: WaterSource[] = (() => {
+  const sources: WaterSource[] = [];
+  for (let x = waterPoolMinX; x <= waterPoolMaxX; x += 1) {
+    for (let z = waterPoolMinZ; z <= waterPoolMaxZ; z += 1) {
+      sources.push({ position: [x, 0.5, z] });
+    }
+  }
+  return sources;
+})();

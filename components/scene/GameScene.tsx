@@ -51,6 +51,8 @@ import { FenceBlock } from "./game/world/FenceBlock";
 import { SlabBlock } from "./game/world/SlabBlock";
 import { StairBlock } from "./game/world/StairBlock";
 import { VoxelWorld } from "./game/world/VoxelWorld";
+import { WaterWorld } from "./game/world/WaterWorld";
+import { useWaterSimulation } from "./game/water/useWaterSimulation";
 import { applyInventorySlotClick, tryAddOneItem } from "./game/inventory/inventorySlotActions";
 import type { InventoryArea } from "./game/inventory/inventorySlotActions";
 import { GameWorldHud } from "./game/ui/GameWorldHud";
@@ -213,6 +215,8 @@ export default function GameScene() {
     setPlacedFixtures,
     getOccupancySnapshot,
   } = useTerrainOccupancy(showcaseDoorOpen);
+
+  const { waterCells, isInWater } = useWaterSimulation(getOccupancySnapshot);
 
   const placedFixturesRef = useRef(placedFixtures);
   placedFixturesRef.current = placedFixtures;
@@ -817,6 +821,7 @@ export default function GameScene() {
           directionalLightRef={directionalLightRef}
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
+        <WaterWorld cells={waterCells} />
         {!removedTerrainBlockKeys.has("fx:door:-3:4") ? (
           <DoorBlock
             position={[-3, 2, 4]}
@@ -1029,6 +1034,7 @@ export default function GameScene() {
           onFallLand={handleFallLand}
           getOccupancySnapshot={getOccupancySnapshot}
           sprintAllowed={hunger > hungerConfig.sprintHungerCutoff}
+          isInWater={isInWater}
         />
         <InteractionRaycast onTarget={onTarget} pointerNdc={interactionPointerNdc} />
         <ScenePointerLockControls
