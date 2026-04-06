@@ -17,6 +17,25 @@ export function overlapsPlayerCellFootprint(x: number, z: number, cellX: number,
   );
 }
 
+/** Horizontal XZ circle vs axis-aligned rectangle (for thin door slabs). */
+export function capsuleIntersectsDoorObstacle(
+  x: number,
+  z: number,
+  feetY: number,
+  bodyHeight: number,
+  radius: number,
+  obs: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+): boolean {
+  const bodyBottom = feetY + 0.001;
+  const bodyTop = feetY + bodyHeight - 0.001;
+  if (bodyTop < obs.minY || bodyBottom > obs.maxY) return false;
+  const closestX = Math.max(obs.minX, Math.min(x, obs.maxX));
+  const closestZ = Math.max(obs.minZ, Math.min(z, obs.maxZ));
+  const dx = x - closestX;
+  const dz = z - closestZ;
+  return dx * dx + dz * dz < radius * radius;
+}
+
 export function blockIntersectsPlayerCapsule(
   position: [number, number, number],
   cameraPosition: THREE.Vector3,

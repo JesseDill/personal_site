@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { PlacedFixture } from "../types";
 import { createTerrainOccupancySnapshot, type TerrainOccupancySnapshot } from "../terrain/occupancy";
 
-export function useTerrainOccupancy() {
+export function useTerrainOccupancy(showcaseDoorOpen: Record<string, boolean> = {}) {
   const [removedTerrainBlockKeys, setRemovedTerrainBlockKeys] = useState(() => new Set<string>());
   const [placedTerrainBlocks, setPlacedTerrainBlocks] = useState<WorldBlock[]>([]);
   const [placedFixtures, setPlacedFixtures] = useState<PlacedFixture[]>([]);
@@ -12,8 +12,9 @@ export function useTerrainOccupancy() {
   placedTerrainBlocksRef.current = placedTerrainBlocks;
 
   const occupancySnapshot = useMemo(
-    () => createTerrainOccupancySnapshot(removedTerrainBlockKeys, placedTerrainBlocks, placedFixtures),
-    [removedTerrainBlockKeys, placedTerrainBlocks, placedFixtures],
+    () =>
+      createTerrainOccupancySnapshot(removedTerrainBlockKeys, placedTerrainBlocks, placedFixtures, showcaseDoorOpen),
+    [removedTerrainBlockKeys, placedTerrainBlocks, placedFixtures, showcaseDoorOpen],
   );
 
   const occupancyRef = useRef<TerrainOccupancySnapshot>(occupancySnapshot);

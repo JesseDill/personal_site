@@ -6,7 +6,12 @@ import {
   type TerrainOccupancySnapshot,
 } from "../terrain/occupancy";
 import { worldSolidColumns } from "../terrain/worldTerrainIndex";
-import { blockIntersectsPlayerCapsule, getOccupiedCellRange, overlapsPlayerCellFootprint } from "./collisionMath";
+import {
+  blockIntersectsPlayerCapsule,
+  capsuleIntersectsDoorObstacle,
+  getOccupiedCellRange,
+  overlapsPlayerCellFootprint,
+} from "./collisionMath";
 
 export function getHighestSupportBelowFeet(
   snapshot: TerrainOccupancySnapshot,
@@ -81,6 +86,14 @@ export function canPlayerOccupyFeetPosition(
       ) {
         return false;
       }
+    }
+  }
+
+  for (const door of snapshot.doorObstacles) {
+    if (
+      capsuleIntersectsDoorObstacle(x, z, feetY, playerBodyHeight, playerCollisionConfig.radius, door)
+    ) {
+      return false;
     }
   }
 

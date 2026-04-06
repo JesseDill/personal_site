@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { WorldMaterial } from "@/data/world";
-import type { CenterTerrainHit } from "../types";
+import type { CenterTerrainHit, FixtureKind } from "../types";
 import { isTerrainRayHitSuppressed } from "./occupancy";
 import type { TerrainOccupancySnapshot } from "./occupancy";
 
@@ -8,6 +8,7 @@ type FixtureHitUserData = {
   terrainMaterial: Exclude<WorldMaterial, "cloud">;
   fixturePrimaryId?: string;
   fixtureBreakPosition?: [number, number, number];
+  fixtureKind?: FixtureKind;
 };
 
 function readFixtureHitUserData(object: THREE.Object3D): FixtureHitUserData | null {
@@ -19,6 +20,7 @@ function readFixtureHitUserData(object: THREE.Object3D): FixtureHitUserData | nu
         terrainMaterial: m,
         fixturePrimaryId: o.userData.fixturePrimaryId as string | undefined,
         fixtureBreakPosition: o.userData.fixtureBreakPosition as [number, number, number] | undefined,
+        fixtureKind: o.userData.fixtureKind as FixtureKind | undefined,
       };
     }
     o = o.parent;
@@ -87,6 +89,32 @@ export function getCenterTerrainHit(
       blockPosition,
       blockKey,
     } satisfies CenterTerrainHit;
+  }
+
+  return null;
+}
+
+/** First door fixture hit along the crosshair within maxDistance, or null. */
+export function getDoorTogglePrimaryId(
+  raycaster: THREE.Raycaster,
+  camera: THREE.Camera,
+  scene: THREE.Scene,
+  maxDistance: number,
+  occupancy: TerrainOccupancySnapshot,
+): string | null {
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+
+  for (const hit of intersects) {
+    if (hit.distance > maxDistance) break;
+
+    const ud = readFixtureHitUserData(hit.object);
+    if (!ud?.fixturePrimaryId || ud.fixtureKind !== "door") continue;
+
+    const blockKey = ud.fixturePrimaryId;
+    if (isTerrainRayHitSuppressed(occupancy, blockKey)) continue;
+
+    return ud.fixturePrimaryId;
   }
 
   return null;

@@ -194,6 +194,7 @@ export default function GameScene() {
   const [hotbarSlots, setHotbarSlots] = useState<InventorySlot[]>(() =>
     Array.from({ length: hotbarSlotCount }, () => null),
   );
+  const [showcaseDoorOpen, setShowcaseDoorOpen] = useState<Record<string, boolean>>({});
 
   const hotbarSlotsRef = useRef(hotbarSlots);
   const mainInventorySlotsRef = useRef(mainInventorySlots);
@@ -211,7 +212,7 @@ export default function GameScene() {
     placedFixtures,
     setPlacedFixtures,
     getOccupancySnapshot,
-  } = useTerrainOccupancy();
+  } = useTerrainOccupancy(showcaseDoorOpen);
 
   const placedFixturesRef = useRef(placedFixtures);
   placedFixturesRef.current = placedFixtures;
@@ -360,6 +361,18 @@ export default function GameScene() {
   const triggerPlacementSwing = useCallback(() => {
     setPlaceSwingTick((current) => current + 1);
   }, []);
+
+  const handleToggleDoor = useCallback((primaryId: string) => {
+    if (primaryId.startsWith("fx:")) {
+      setShowcaseDoorOpen((prev) => ({ ...prev, [primaryId]: !prev[primaryId] }));
+    } else {
+      setPlacedFixtures((fixtures) =>
+        fixtures.map((f) =>
+          f.primaryId === primaryId && f.fixtureKind === "door" ? { ...f, isOpen: !f.isOpen } : f,
+        ),
+      );
+    }
+  }, [setPlacedFixtures]);
 
   const pushDroppedItem = useCallback((material: InventoryMaterial, blockPosition: [number, number, number], idPrefix: string) => {
     setDroppedItems((current) => {
@@ -810,6 +823,7 @@ export default function GameScene() {
             fixturePrimaryId="fx:door:-3:4"
             terrainMaterial="woodPlanks"
             breakPosition={[-3, 2, 4]}
+            isOpen={Boolean(showcaseDoorOpen["fx:door:-3:4"])}
           />
         ) : null}
         {!removedTerrainBlockKeys.has("fx:stair:1:4") ? (
@@ -923,7 +937,8 @@ export default function GameScene() {
                 fixturePrimaryId={f.primaryId}
                 terrainMaterial={f.terrainMaterial}
                 breakPosition={f.breakPosition}
-                rotation={[0, f.rotationY, 0]}
+                rotationY={f.rotationY}
+                isOpen={Boolean(f.isOpen)}
               />
             );
           }
@@ -954,7 +969,8 @@ export default function GameScene() {
           heldInventoryMaterial={heldInventoryMaterial}
           availableCount={placementAvailableCount}
           onPlaceBlock={placeFromInventory}
-          onPlaceSwing={triggerPlacementSwing}
+          onRightClickSwing={triggerPlacementSwing}
+          onToggleDoor={handleToggleDoor}
           getOccupancySnapshot={getOccupancySnapshot}
         />
         <BillboardPhotoSign

@@ -9,7 +9,7 @@ import type { InventoryMaterial } from "../types";
 import { blockIntersectsPlayerCapsule } from "../physics/collisionMath";
 import { getAdjacentPlacementPositionFromHit, isTerrainBlockKeyOccupied } from "../terrain/occupancy";
 import { getTerrainBlockKey } from "../terrain/blockKeys";
-import { getCenterTerrainHit } from "../terrain/raycastTerrain";
+import { getCenterTerrainHit, getDoorTogglePrimaryId } from "../terrain/raycastTerrain";
 import type { TerrainOccupancySnapshot } from "../terrain/occupancy";
 
 export type PlacementFacingContext = {
@@ -22,7 +22,8 @@ export function BlockPlacementController({
   heldInventoryMaterial,
   availableCount,
   onPlaceBlock,
-  onPlaceSwing,
+  onRightClickSwing,
+  onToggleDoor,
   getOccupancySnapshot,
 }: {
   enabled: boolean;
@@ -33,7 +34,9 @@ export function BlockPlacementController({
     blockPosition: [number, number, number],
     facing: PlacementFacingContext,
   ) => void;
-  onPlaceSwing: () => void;
+  /** Non-breaking arm swing on every right click in explore mode. */
+  onRightClickSwing: () => void;
+  onToggleDoor: (primaryId: string) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
 }) {
   const { camera, scene } = useThree();
@@ -78,20 +81,35 @@ export function BlockPlacementController({
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     onPlaceBlock(heldInventoryMaterial, blockPosition, { forwardX: forward.x, forwardZ: forward.z });
-    onPlaceSwing();
-  }, [availableCount, camera, enabled, getOccupancySnapshot, heldInventoryMaterial, onPlaceBlock, onPlaceSwing, raycaster, scene]);
+  }, [availableCount, camera, enabled, getOccupancySnapshot, heldInventoryMaterial, onPlaceBlock, raycaster, scene]);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => {
-      if (!enabled || !heldInventoryMaterial || availableCount <= 0) return;
+      if (!enabled) return;
       event.preventDefault();
     };
 
     const handleMouseDown = (event: MouseEvent) => {
       if (event.button !== 2) return;
-      if (!enabled || !heldInventoryMaterial || availableCount <= 0) return;
+      if (!enabled) return;
 
       event.preventDefault();
+      onRightClickSwing();
+
+      const snapshot = getOccupancySnapshot();
+      const doorId = getDoorTogglePrimaryId(
+        raycaster,
+        camera,
+        scene,
+        terrainImpactConfig.maxDistance,
+        snapshot,
+      );
+      if (doorId) {
+        onToggleDoor(doorId);
+        return;
+      }
+
+      if (!heldInventoryMaterial || availableCount <= 0) return;
       tryPlaceBlock();
     };
 
@@ -101,7 +119,18 @@ export function BlockPlacementController({
       window.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("mousedown", handleMouseDown);
     };
-  }, [availableCount, enabled, heldInventoryMaterial, tryPlaceBlock]);
+  }, [
+    availableCount,
+    camera,
+    enabled,
+    getOccupancySnapshot,
+    heldInventoryMaterial,
+    onRightClickSwing,
+    onToggleDoor,
+    raycaster,
+    scene,
+    tryPlaceBlock,
+  ]);
 
   return null;
 }

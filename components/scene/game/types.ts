@@ -32,6 +32,19 @@ export type PlacedFixture = {
   rotationY: number;
   /** Slab / stair / fence wood texture; door ignores and uses door.svg */
   texturePath: string;
+  /** Wooden doors only: swung open (90°) vs closed. */
+  isOpen?: boolean;
+};
+
+/** World-space axis-aligned bounds for thin door collision (separate from full-cell SolidSegment columns). */
+export type DoorObstacle = {
+  primaryId: string;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
 };
 
 export type CenterTerrainHit = {

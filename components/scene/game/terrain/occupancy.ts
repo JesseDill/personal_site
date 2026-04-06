@@ -1,23 +1,27 @@
 import type { WorldBlock } from "@/data/world";
-import type { CenterTerrainHit, PlacedFixture, SolidSegment } from "../types";
+import type { CenterTerrainHit, DoorObstacle, PlacedFixture, SolidSegment } from "../types";
 import { getTerrainBlockKey } from "./blockKeys";
 import { buildSolidColumnsFromBlocks } from "./solidColumns";
 import { showcaseFixtures } from "./fixtureDefinitions";
+import { collectDoorObstacles } from "./doorCollision";
 import { worldTerrainBlockKeys } from "./worldTerrainIndex";
 
 export type TerrainOccupancySnapshot = {
   removedKeys: ReadonlySet<string>;
   placedBlocksByKey: ReadonlyMap<string, WorldBlock>;
   placedSolidColumns: ReadonlyMap<string, SolidSegment[]>;
-  /** Dynamic placed fixtures (slab/stair/fence/door) merged into support / collision. */
+  /** Dynamic placed fixtures (slab/stair/fence/door) merged into support / collision — doors excluded (thin collision via doorObstacles). */
   placedFixtureSolidColumns: ReadonlyMap<string, SolidSegment[]>;
   /** Segment blockKeys for active (non-removed) fixtures — used for placement overlap checks. */
   activeFixtureBlockKeys: ReadonlySet<string>;
+  /** Thin wooden door AABBs for player collision (closed and open poses). */
+  doorObstacles: ReadonlyArray<DoorObstacle>;
 };
 
 function buildPlacedFixtureSolidColumns(fixtures: PlacedFixture[]): Map<string, SolidSegment[]> {
   const columns = new Map<string, SolidSegment[]>();
   for (const f of fixtures) {
+    if (f.fixtureKind === "door") continue;
     for (const seg of f.physicsSegments) {
       const key = `${seg.cellX}:${seg.cellZ}`;
       const list = columns.get(key) ?? [];
@@ -49,11 +53,14 @@ export function createTerrainOccupancySnapshot(
   removedKeys: Set<string>,
   placedBlocks: WorldBlock[],
   placedFixtures: PlacedFixture[],
+  showcaseDoorOpen: Record<string, boolean> = {},
 ): TerrainOccupancySnapshot {
   const placedBlocksByKey = new Map<string, WorldBlock>();
   for (const block of placedBlocks) {
     placedBlocksByKey.set(getTerrainBlockKey(block.position), block);
   }
+
+  const doorObstacles = collectDoorObstacles(removedKeys, placedFixtures, showcaseDoorOpen);
 
   return {
     removedKeys,
@@ -61,6 +68,7 @@ export function createTerrainOccupancySnapshot(
     placedSolidColumns: buildSolidColumnsFromBlocks(placedBlocks),
     placedFixtureSolidColumns: buildPlacedFixtureSolidColumns(placedFixtures),
     activeFixtureBlockKeys: computeActiveFixtureBlockKeys(removedKeys, placedFixtures),
+    doorObstacles,
   };
 }
 
