@@ -63,7 +63,7 @@ export function PlayerController({
   /** Horizontal distance in world units (blocks) moved this frame; used for hunger, etc. */
   onDistanceWalked?: (distance: number) => void;
   /** Vertical drop in blocks from peak feet height while airborne to landing feet Y. */
-  onFallLand?: (fallDistance: number) => void;
+  onFallLand?: (fallDistance: number, feetPosition: [number, number, number]) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
   /** When false, Shift does not increase forward speed (e.g. low hunger). */
   sprintAllowed?: boolean;
@@ -393,9 +393,7 @@ export function PlayerController({
         const peak = airbornePeakFeetRef.current;
         if (peak !== null && !feetInWater) {
           const fallDistance = peak - nextFeetY;
-          if (fallDistance > 0.05) {
-            onFallLandRef.current?.(fallDistance);
-          }
+          onFallLandRef.current?.(fallDistance, [nextX, nextFeetY, nextZ]);
         }
         airbornePeakFeetRef.current = null;
       } else {

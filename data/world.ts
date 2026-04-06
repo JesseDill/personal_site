@@ -21,6 +21,7 @@ export type WorldMaterial =
   | "projectsAccent"
   | "researchAccent"
   | "contactAccent"
+  | "farmland"
   | "cloud";
 
 export type WorldBlock = {
@@ -353,6 +354,18 @@ for (let x = waterPoolMinX; x <= waterPoolMaxX; x += 1) {
   }
 }
 
+const farmMinX = 8;
+const farmMaxX = 10;
+const farmMinZ = -2;
+const farmMaxZ = 0;
+
+const farmCellKeys = new Set<string>();
+for (let x = farmMinX; x <= farmMaxX; x += 1) {
+  for (let z = farmMinZ; z <= farmMaxZ; z += 1) {
+    farmCellKeys.add(`${x}:${z}`);
+  }
+}
+
 function addPerimeterWalls(blocks: WorldBlock[]) {
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     blocks.push({ position: [x, 0.5, worldBounds.minZ], material: "stoneDark", solid: true });
@@ -396,9 +409,12 @@ function buildWorldBlocks() {
 
   for (let x = worldBounds.minX; x <= worldBounds.maxX; x += 1) {
     for (let z = worldBounds.minZ; z <= worldBounds.maxZ; z += 1) {
-      if (!waterPoolCellKeys.has(`${x}:${z}`)) {
-        addTerrainColumn(blocks, x, z);
+      if (waterPoolCellKeys.has(`${x}:${z}`)) continue;
+      if (farmCellKeys.has(`${x}:${z}`)) {
+        blocks.push({ position: [x, -0.5, z], material: "farmland" });
+        continue;
       }
+      addTerrainColumn(blocks, x, z);
     }
   }
 
@@ -455,6 +471,15 @@ export const worldBlocks = buildWorldBlocks();
 export const obstacleCells = new Set(
   worldBlocks.filter((block) => block.solid).map((block) => cellKey(block.position[0], block.position[2])),
 );
+
+/** Block keys of farmland cells that start with carrots planted. */
+export const worldAuthoredCrops = new Set<string>([
+  "8:0.5:-2",
+  "9:0.5:-1",
+  "10:0.5:0",
+  "8:0.5:0",
+  "10:0.5:-2",
+]);
 
 export const worldWaterSources: WaterSource[] = (() => {
   const sources: WaterSource[] = [];

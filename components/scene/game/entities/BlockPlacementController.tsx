@@ -24,6 +24,8 @@ export function BlockPlacementController({
   onPlaceBlock,
   onRightClickSwing,
   onToggleDoor,
+  onPlantCrop,
+  plantedCropKeys,
   getOccupancySnapshot,
 }: {
   enabled: boolean;
@@ -37,6 +39,8 @@ export function BlockPlacementController({
   /** Non-breaking arm swing on every right click in explore mode. */
   onRightClickSwing: () => void;
   onToggleDoor: (primaryId: string) => void;
+  onPlantCrop: (blockKey: string, blockPosition: [number, number, number]) => void;
+  plantedCropKeys: ReadonlySet<string>;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
 }) {
   const { camera, scene } = useThree();
@@ -109,6 +113,20 @@ export function BlockPlacementController({
         return;
       }
 
+      if (heldInventoryMaterial === "carrot" && availableCount > 0) {
+        const terrainHit = getCenterTerrainHit(
+          raycaster,
+          camera,
+          scene,
+          terrainImpactConfig.maxDistance,
+          snapshot,
+        );
+        if (terrainHit && terrainHit.terrainMaterial === "farmland" && !plantedCropKeys.has(terrainHit.blockKey)) {
+          onPlantCrop(terrainHit.blockKey, terrainHit.blockPosition);
+        }
+        return;
+      }
+
       if (!heldInventoryMaterial || availableCount <= 0) return;
       tryPlaceBlock();
     };
@@ -125,8 +143,10 @@ export function BlockPlacementController({
     enabled,
     getOccupancySnapshot,
     heldInventoryMaterial,
+    onPlantCrop,
     onRightClickSwing,
     onToggleDoor,
+    plantedCropKeys,
     raycaster,
     scene,
     tryPlaceBlock,

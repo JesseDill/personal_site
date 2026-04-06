@@ -4,14 +4,14 @@ import { cubeFaceOrder } from "../materials/types";
 import { assetPath } from "@/lib/assetPrefix";
 
 /** How an item is drawn in HUD icon, dropped-item mesh, and first-person hand. */
-export type InventoryItemRenderKind = "voxelCube" | "slab" | "stair" | "fence" | "door";
+export type InventoryItemRenderKind = "voxelCube" | "sprite" | "slab" | "stair" | "fence" | "door";
 
 export type CollectedInventoryItemConfig = {
   label: string;
   renderKind: InventoryItemRenderKind;
   /** Six face texture paths for `voxelCube`; ignored for fixture kinds. */
   faceTextures?: string[];
-  /** Primary texture for slab/stair/fence; door uses dedicated art. */
+  /** Primary texture for slab/stair/fence/door; `sprite` uses a single transparent sprite. */
   texturePath?: string;
 };
 
@@ -33,6 +33,11 @@ export const collectedInventoryConfig = {
     label: "Planks",
     renderKind: "voxelCube",
     faceTextures: woodPlanksFaces,
+  },
+  carrot: {
+    label: "Carrot",
+    renderKind: "sprite",
+    texturePath: assetPath("/textures/world/carrot.svg"),
   },
   woodenSlab: {
     label: "Wood Slab",

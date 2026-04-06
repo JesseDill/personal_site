@@ -6,6 +6,7 @@ export type InventoryMaterial =
   | "dirt"
   | "wood"
   | "woodPlanks"
+  | "carrot"
   | "woodenSlab"
   | "woodenStair"
   | "woodenFence"

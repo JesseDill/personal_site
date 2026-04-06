@@ -114,6 +114,24 @@ function DroppedItemVisual({
   const cfg = collectedInventoryConfig[item.material];
   const primary = plankTexture;
 
+  if (cfg.renderKind === "sprite") {
+    const map = faceTextures[0];
+    return (
+      <mesh castShadow={false} receiveShadow>
+        <planeGeometry args={[0.34, 0.34]} />
+        <meshStandardMaterial
+          map={map}
+          color="#ffffff"
+          roughness={0.92}
+          metalness={0}
+          transparent
+          alphaTest={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    );
+  }
+
   const matStd = (map: THREE.Texture, door = false) => (
     <meshStandardMaterial
       map={map}
@@ -220,6 +238,7 @@ export function DroppedBlockItems({
         woodenSlab: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
         woodenStair: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
         woodenFence: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
+        carrot: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/carrot.svg")]),
         woodenDoor: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/door.svg")]),
       }) satisfies Record<DroppedBlockItem["material"], THREE.Texture[]>,
     [texturesByPath],
@@ -241,7 +260,9 @@ export function DroppedBlockItems({
                 ? 0.15
                 : cfg.renderKind === "fence"
                   ? 0.17
-                  : 0.17;
+                  : cfg.renderKind === "sprite"
+                    ? 0.17
+                    : 0.17;
         return (
           <DroppedItemPhysics
             key={item.id}

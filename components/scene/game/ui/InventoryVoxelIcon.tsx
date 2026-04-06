@@ -27,6 +27,28 @@ function InventoryItemPreviewScene({
 
   const primary = textures[0];
 
+  if (cfg.renderKind === "sprite" && primary) {
+    return (
+      <>
+        <ambientLight intensity={1.35} />
+        <directionalLight position={[3, 4, 5]} intensity={1.1} />
+        <mesh rotation={[0.2, 0.5, 0]} scale={1.12}>
+          <planeGeometry args={[1, 1]} />
+          <meshStandardMaterial
+            map={primary}
+            color="#ffffff"
+            roughness={1}
+            metalness={0}
+            toneMapped={false}
+            transparent
+            alphaTest={0.5}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </>
+    );
+  }
+
   if (cfg.renderKind === "voxelCube" && textures.length >= 6) {
     return (
       <>

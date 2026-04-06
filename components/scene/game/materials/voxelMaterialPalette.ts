@@ -124,6 +124,15 @@ export const voxelMaterialPalette = {
     emissive: "#7de4d0",
     emissiveIntensity: 0.14,
   },
+  farmland: {
+    textures: {
+      top: assetPath("/textures/world/farmland-top.svg"),
+      bottom: assetPath("/textures/world/dirt.svg"),
+      side: assetPath("/textures/world/dirt.svg"),
+    },
+    uiColor: "#6b4226",
+    roughness: 1,
+  },
   cloud: { textures: { all: assetPath("/textures/world/cloud.svg") }, uiColor: "#f8fafc", roughness: 1, metalness: 0.02 },
 } satisfies VoxelMaterialPalette;
 
@@ -137,7 +146,7 @@ export const faceTexturePaths = Object.fromEntries(
 export const uniqueVoxelTexturePaths = Array.from(
   new Set([
     ...Object.values(faceTexturePaths).flatMap((facePaths) => cubeFaceOrder.map((face) => facePaths[face])),
-    /** Door mesh (fixtures) — not a voxel face set but needed by `useVoxelTextures` for drops. */
     assetPath("/textures/world/door.svg"),
+    assetPath("/textures/world/carrot.svg"),
   ]),
 );

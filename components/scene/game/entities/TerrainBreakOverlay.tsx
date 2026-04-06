@@ -11,6 +11,7 @@ import { configurePixelTexture } from "../materials/configurePixelTexture";
 import type { BreakableTerrainHit, TerrainBreakOverlayState } from "../types";
 import { isTerrainRayHitSuppressed, type TerrainOccupancySnapshot } from "../terrain/occupancy";
 import { getCenterTerrainHit } from "../terrain/raycastTerrain";
+import type { WorldMaterial } from "@/data/world";
 
 export function TerrainBreakOverlay({
   trigger,
@@ -18,6 +19,8 @@ export function TerrainBreakOverlay({
   swingHeld,
   removedBlockKeys,
   onBreakBlock,
+  shouldInterceptHit,
+  onInterceptedHit,
   getOccupancySnapshot,
 }: {
   trigger: number;
@@ -25,6 +28,8 @@ export function TerrainBreakOverlay({
   swingHeld: boolean;
   removedBlockKeys: Set<string>;
   onBreakBlock: (block: BreakableTerrainHit) => void;
+  shouldInterceptHit?: (blockKey: string, terrainMaterial: Exclude<WorldMaterial, "cloud">) => boolean;
+  onInterceptedHit?: (block: BreakableTerrainHit) => void;
   getOccupancySnapshot: () => TerrainOccupancySnapshot;
 }) {
   const { camera, scene } = useThree();
@@ -56,6 +61,16 @@ export function TerrainBreakOverlay({
       return;
     }
 
+    if (shouldInterceptHit?.(terrainHit.blockKey, terrainHit.terrainMaterial)) {
+      onInterceptedHit?.({
+        blockKey: terrainHit.blockKey,
+        blockPosition: terrainHit.blockPosition,
+        terrainMaterial: terrainHit.terrainMaterial,
+      });
+      setOverlayState(null);
+      return;
+    }
+
     setOverlayState((current) => {
       if (current?.blockKey === terrainHit.blockKey) {
         return {
@@ -72,7 +87,7 @@ export function TerrainBreakOverlay({
         hits: 1,
       };
     });
-  }, [camera, enabled, getOccupancySnapshot, raycaster, removedBlockKeys, scene, trigger]);
+  }, [camera, enabled, getOccupancySnapshot, onInterceptedHit, raycaster, removedBlockKeys, scene, shouldInterceptHit, trigger]);
 
   useEffect(() => {
     const snapshot = getOccupancySnapshot();

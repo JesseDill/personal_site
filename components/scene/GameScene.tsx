@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import type { WorldMaterial } from "@/data/world";
-import { worldBlocks, worldSky } from "@/data/world";
+import { worldAuthoredCrops, worldBlocks, worldSky } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
@@ -52,6 +52,7 @@ import { SlabBlock } from "./game/world/SlabBlock";
 import { StairBlock } from "./game/world/StairBlock";
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { WaterWorld } from "./game/world/WaterWorld";
+import { CropOverlay } from "./game/world/CropOverlay";
 import { useWaterSimulation } from "./game/water/useWaterSimulation";
 import { applyInventorySlotClick, tryAddOneItem } from "./game/inventory/inventorySlotActions";
 import type { InventoryArea } from "./game/inventory/inventorySlotActions";
@@ -197,6 +198,9 @@ export default function GameScene() {
     Array.from({ length: hotbarSlotCount }, () => null),
   );
   const [showcaseDoorOpen, setShowcaseDoorOpen] = useState<Record<string, boolean>>({});
+  const [plantedCrops, setPlantedCrops] = useState(() => new Set(worldAuthoredCrops));
+  const plantedCropsRef = useRef(plantedCrops);
+  plantedCropsRef.current = plantedCrops;
 
   const hotbarSlotsRef = useRef(hotbarSlots);
   const mainInventorySlotsRef = useRef(mainInventorySlots);
@@ -321,21 +325,6 @@ export default function GameScene() {
     setHasEnteredWorldThisSession(false);
   }, [resetVitals]);
 
-  const handleFallLand = useCallback(
-    (fallDistance: number) => {
-      const blocks = Math.floor(fallDistance);
-      const rawDamage = Math.max(0, blocks - healthConfig.fallDamageSafeDistance);
-      const damage = Math.min(rawDamage, healthConfig.fallDamageMaxPoints);
-      if (damage <= 0) return;
-      setHealth((prev) => {
-        const next = Math.max(prev - damage, 0);
-        if (next < prev) triggerDamageFeedback();
-        return next;
-      });
-    },
-    [triggerDamageFeedback],
-  );
-
   useEffect(() => {
     if (hunger > 0 || health <= healthConfig.starvationMinHealth) return;
 
@@ -396,6 +385,56 @@ export default function GameScene() {
     });
   }, []);
 
+  const handleFallLand = useCallback(
+    (fallDistance: number, feetPosition: [number, number, number]) => {
+      if (fallDistance > 0.05) {
+        const blocks = Math.floor(fallDistance);
+        const rawDamage = Math.max(0, blocks - healthConfig.fallDamageSafeDistance);
+        const damage = Math.min(rawDamage, healthConfig.fallDamageMaxPoints);
+        if (damage > 0) {
+          setHealth((prev) => {
+            const next = Math.max(prev - damage, 0);
+            if (next < prev) triggerDamageFeedback();
+            return next;
+          });
+        }
+      }
+
+      const feetY = feetPosition[1];
+      const blockCenterY = Math.round((feetY - 0.5) * 2) / 2;
+      const blockBelowKey = getTerrainBlockKey([
+        Math.round(feetPosition[0]),
+        blockCenterY,
+        Math.round(feetPosition[2]),
+      ]);
+      const blockMaterial = visibleTerrainBlocksByKeyRef.current.get(blockBelowKey);
+      if (blockMaterial === "farmland") {
+        const blockPos: [number, number, number] = [
+          Math.round(feetPosition[0]),
+          blockCenterY,
+          Math.round(feetPosition[2]),
+        ];
+        if (placedTerrainBlocksRef.current.some((e) => getTerrainBlockKey(e.position) === blockBelowKey)) {
+          setPlacedTerrainBlocks((cur) =>
+            cur.map((e) => (getTerrainBlockKey(e.position) === blockBelowKey ? { ...e, material: "dirt" as const } : e)),
+          );
+        } else {
+          setRemovedTerrainBlockKeys((cur) => new Set(cur).add(blockBelowKey));
+          setPlacedTerrainBlocks((cur) => [...cur, { position: blockPos, material: "dirt", solid: true }]);
+        }
+        if (plantedCropsRef.current.has(blockBelowKey)) {
+          setPlantedCrops((prev) => {
+            const next = new Set(prev);
+            next.delete(blockBelowKey);
+            return next;
+          });
+          pushDroppedItem("carrot", blockPos, blockBelowKey);
+        }
+      }
+    },
+    [triggerDamageFeedback, pushDroppedItem, setPlacedTerrainBlocks, setRemovedTerrainBlockKeys],
+  );
+
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
     if (unbreakableTerrainMaterials.has(block.terrainMaterial)) return;
 
@@ -436,12 +475,21 @@ export default function GameScene() {
         ? "wood"
         : block.terrainMaterial === "woodPlanks"
           ? "woodPlanks"
-          : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt"
+          : block.terrainMaterial === "grass" || block.terrainMaterial === "grassShade" || block.terrainMaterial === "dirt" || block.terrainMaterial === "farmland"
             ? "dirt"
             : null;
 
     if (droppedMaterial) {
       pushDroppedItem(droppedMaterial, block.blockPosition, block.blockKey);
+    }
+
+    if (plantedCropsRef.current.has(block.blockKey)) {
+      setPlantedCrops((prev) => {
+        const next = new Set(prev);
+        next.delete(block.blockKey);
+        return next;
+      });
+      pushDroppedItem("carrot", block.blockPosition, block.blockKey);
     }
   }, [placedTerrainBlocksRef, pushDroppedItem, setPlacedTerrainBlocks, setPlacedFixtures, setRemovedTerrainBlockKeys]);
 
@@ -565,6 +613,35 @@ export default function GameScene() {
       });
     },
     [selectedInventorySlot],
+  );
+
+  const handlePlantCrop = useCallback(
+    (blockKey: string) => {
+      if (plantedCropsRef.current.has(blockKey)) return;
+      setPlantedCrops((prev) => new Set(prev).add(blockKey));
+      decrementSelectedHotbarStack("carrot");
+    },
+    [decrementSelectedHotbarStack],
+  );
+
+  const handleHarvestCrop = useCallback(
+    (block: BreakableTerrainHit) => {
+      if (!plantedCropsRef.current.has(block.blockKey)) return;
+      setPlantedCrops((prev) => {
+        const next = new Set(prev);
+        next.delete(block.blockKey);
+        return next;
+      });
+      pushDroppedItem("carrot", block.blockPosition, block.blockKey);
+    },
+    [pushDroppedItem],
+  );
+
+  const shouldInterceptBreakHit = useCallback(
+    (blockKey: string, terrainMaterial: Exclude<WorldMaterial, "cloud">) => {
+      return terrainMaterial === "farmland" && plantedCropsRef.current.has(blockKey);
+    },
+    [],
   );
 
   const placeFromInventory = useCallback(
@@ -779,6 +856,15 @@ export default function GameScene() {
     () => composeVisibleTerrainBlocks(worldBlocks, removedTerrainBlockKeys, placedTerrainBlocks),
     [placedTerrainBlocks, removedTerrainBlockKeys],
   );
+  const visibleTerrainBlocksByKey = useMemo(() => {
+    const map = new Map<string, WorldMaterial>();
+    for (const b of visibleTerrainBlocks) {
+      map.set(getTerrainBlockKey(b.position), b.material);
+    }
+    return map;
+  }, [visibleTerrainBlocks]);
+  const visibleTerrainBlocksByKeyRef = useRef(visibleTerrainBlocksByKey);
+  visibleTerrainBlocksByKeyRef.current = visibleTerrainBlocksByKey;
 
   const introLayout = spawnBillboardLayout.introText;
   const { linkColor: introLinkColor, ...introTextMeshProps } = introLayout;
@@ -822,6 +908,7 @@ export default function GameScene() {
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
         <WaterWorld cells={waterCells} />
+        <CropOverlay cropKeys={plantedCrops} visibleBlocks={visibleTerrainBlocks} />
         {!removedTerrainBlockKeys.has("fx:door:-3:4") ? (
           <DoorBlock
             position={[-3, 2, 4]}
@@ -967,6 +1054,8 @@ export default function GameScene() {
           swingHeld={armSwingHeld}
           removedBlockKeys={removedTerrainBlockKeys}
           onBreakBlock={removeTerrainBlock}
+          shouldInterceptHit={shouldInterceptBreakHit}
+          onInterceptedHit={handleHarvestCrop}
           getOccupancySnapshot={getOccupancySnapshot}
         />
         <BlockPlacementController
@@ -976,6 +1065,8 @@ export default function GameScene() {
           onPlaceBlock={placeFromInventory}
           onRightClickSwing={triggerPlacementSwing}
           onToggleDoor={handleToggleDoor}
+          onPlantCrop={handlePlantCrop}
+          plantedCropKeys={plantedCrops}
           getOccupancySnapshot={getOccupancySnapshot}
         />
         <BillboardPhotoSign

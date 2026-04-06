@@ -1,5 +1,6 @@
 "use client";
 
+import { Billboard } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -46,6 +47,29 @@ function HeldItemMesh({
           />
         ))}
       </mesh>
+    );
+  }
+
+  if (cfg.renderKind === "sprite") {
+    const spriteMap = faceTextures[0];
+    const spritePosition: [number, number, number] = [0.06, -0.22, 0.02];
+    const spriteScale = 0.55;
+    return (
+      <Billboard follow position={spritePosition} renderOrder={6}>
+        <mesh frustumCulled={false} scale={spriteScale}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={spriteMap}
+            color="#ffffff"
+            depthTest
+            depthWrite
+            toneMapped={false}
+            transparent
+            alphaTest={0.5}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </Billboard>
     );
   }
 
