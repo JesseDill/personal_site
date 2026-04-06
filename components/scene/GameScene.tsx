@@ -41,6 +41,7 @@ import { getTerrainBlockKey } from "./game/terrain/blockKeys";
 import {
   getFixtureDropMaterial,
   resolveFixtureRemovalKeys,
+  showcaseFixtures,
 } from "./game/terrain/fixtureDefinitions";
 import { createPlacedFixture, rotationYFromCameraForward } from "./game/terrain/fixturePlacement";
 import { fenceConnectionsAt } from "./game/terrain/fenceConnections";
@@ -954,33 +955,23 @@ export default function GameScene() {
             breakPosition={[2, 1.25, 3]}
           />
         ) : null}
-        {!removedTerrainBlockKeys.has("fx:fence:-3:3") ? (
-          <FenceBlock
-            position={[-3, 1.5, 3]}
-            fixturePrimaryId="fx:fence:-3:3"
-            terrainMaterial="woodPlanks"
-            breakPosition={[-3, 1.5, 3]}
-            {...fenceConnectionsAt(-3, 3, removedTerrainBlockKeys, placedFixtures)}
-          />
-        ) : null}
-        {!removedTerrainBlockKeys.has("fx:fence:-2:3") ? (
-          <FenceBlock
-            position={[-2, 1.5, 3]}
-            fixturePrimaryId="fx:fence:-2:3"
-            terrainMaterial="woodPlanks"
-            breakPosition={[-2, 1.5, 3]}
-            {...fenceConnectionsAt(-2, 3, removedTerrainBlockKeys, placedFixtures)}
-          />
-        ) : null}
-        {!removedTerrainBlockKeys.has("fx:fence:-1:3") ? (
-          <FenceBlock
-            position={[-1, 1.5, 3]}
-            fixturePrimaryId="fx:fence:-1:3"
-            terrainMaterial="woodPlanks"
-            breakPosition={[-1, 1.5, 3]}
-            {...fenceConnectionsAt(-1, 3, removedTerrainBlockKeys, placedFixtures)}
-          />
-        ) : null}
+        {showcaseFixtures
+          .filter((f) => f.fixtureKind === "fence" && f.primaryId.startsWith("fx:fence:well:"))
+          .map((f) => {
+            const cx = Math.round(f.breakPosition[0]);
+            const cz = Math.round(f.breakPosition[2]);
+            return !removedTerrainBlockKeys.has(f.primaryId) ? (
+              <FenceBlock
+                key={f.primaryId}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial="woodPlanks"
+                breakPosition={f.breakPosition}
+                stackLevels={3}
+                {...fenceConnectionsAt(cx, cz, removedTerrainBlockKeys, placedFixtures)}
+              />
+            ) : null;
+          })}
         {placedFixtures.map((f) => {
           const cx = Math.round(f.breakPosition[0]);
           const cz = Math.round(f.breakPosition[2]);

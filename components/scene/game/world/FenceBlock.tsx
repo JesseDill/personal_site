@@ -12,6 +12,8 @@ type FenceBlockProps = {
   fixturePrimaryId: string;
   terrainMaterial: Exclude<WorldMaterial, "cloud">;
   breakPosition: [number, number, number];
+  /** Stacked full-height posts (1 = default single block). */
+  stackLevels?: number;
   /** +Z */
   connectNorth?: boolean;
   /** -Z */
@@ -31,6 +33,7 @@ export function FenceBlock({
   fixturePrimaryId,
   terrainMaterial,
   breakPosition,
+  stackLevels = 1,
   connectNorth,
   connectSouth,
   connectEast,
@@ -67,51 +70,58 @@ export function FenceBlock({
     [terrainMaterial, fixturePrimaryId, breakPosition],
   );
 
+  const half = (stackLevels - 1) / 2;
+  const railOffsets = Array.from({ length: stackLevels }, (_, i) => i - half);
+
   return (
     <group position={position} userData={hitUserData}>
-      <mesh castShadow receiveShadow material={material}>
-        <boxGeometry args={[0.25, 1, 0.25]} />
-      </mesh>
-      {connectEast ? (
-        <>
-          <mesh castShadow receiveShadow material={material} position={[0.3125, -0.25, 0]}>
-            <boxGeometry args={[0.375, 0.125, 0.125]} />
+      {railOffsets.map((oy) => (
+        <group key={oy} position={[0, oy, 0]}>
+          <mesh castShadow receiveShadow material={material}>
+            <boxGeometry args={[0.25, 1, 0.25]} />
           </mesh>
-          <mesh castShadow receiveShadow material={material} position={[0.3125, 0.15, 0]}>
-            <boxGeometry args={[0.375, 0.125, 0.125]} />
-          </mesh>
-        </>
-      ) : null}
-      {connectWest ? (
-        <>
-          <mesh castShadow receiveShadow material={material} position={[-0.3125, -0.25, 0]}>
-            <boxGeometry args={[0.375, 0.125, 0.125]} />
-          </mesh>
-          <mesh castShadow receiveShadow material={material} position={[-0.3125, 0.15, 0]}>
-            <boxGeometry args={[0.375, 0.125, 0.125]} />
-          </mesh>
-        </>
-      ) : null}
-      {connectNorth ? (
-        <>
-          <mesh castShadow receiveShadow material={material} position={[0, -0.25, 0.3125]}>
-            <boxGeometry args={[0.125, 0.125, 0.375]} />
-          </mesh>
-          <mesh castShadow receiveShadow material={material} position={[0, 0.15, 0.3125]}>
-            <boxGeometry args={[0.125, 0.125, 0.375]} />
-          </mesh>
-        </>
-      ) : null}
-      {connectSouth ? (
-        <>
-          <mesh castShadow receiveShadow material={material} position={[0, -0.25, -0.3125]}>
-            <boxGeometry args={[0.125, 0.125, 0.375]} />
-          </mesh>
-          <mesh castShadow receiveShadow material={material} position={[0, 0.15, -0.3125]}>
-            <boxGeometry args={[0.125, 0.125, 0.375]} />
-          </mesh>
-        </>
-      ) : null}
+          {connectEast ? (
+            <>
+              <mesh castShadow receiveShadow material={material} position={[0.3125, -0.25, 0]}>
+                <boxGeometry args={[0.375, 0.125, 0.125]} />
+              </mesh>
+              <mesh castShadow receiveShadow material={material} position={[0.3125, 0.15, 0]}>
+                <boxGeometry args={[0.375, 0.125, 0.125]} />
+              </mesh>
+            </>
+          ) : null}
+          {connectWest ? (
+            <>
+              <mesh castShadow receiveShadow material={material} position={[-0.3125, -0.25, 0]}>
+                <boxGeometry args={[0.375, 0.125, 0.125]} />
+              </mesh>
+              <mesh castShadow receiveShadow material={material} position={[-0.3125, 0.15, 0]}>
+                <boxGeometry args={[0.375, 0.125, 0.125]} />
+              </mesh>
+            </>
+          ) : null}
+          {connectNorth ? (
+            <>
+              <mesh castShadow receiveShadow material={material} position={[0, -0.25, 0.3125]}>
+                <boxGeometry args={[0.125, 0.125, 0.375]} />
+              </mesh>
+              <mesh castShadow receiveShadow material={material} position={[0, 0.15, 0.3125]}>
+                <boxGeometry args={[0.125, 0.125, 0.375]} />
+              </mesh>
+            </>
+          ) : null}
+          {connectSouth ? (
+            <>
+              <mesh castShadow receiveShadow material={material} position={[0, -0.25, -0.3125]}>
+                <boxGeometry args={[0.125, 0.125, 0.375]} />
+              </mesh>
+              <mesh castShadow receiveShadow material={material} position={[0, 0.15, -0.3125]}>
+                <boxGeometry args={[0.125, 0.125, 0.375]} />
+              </mesh>
+            </>
+          ) : null}
+        </group>
+      ))}
     </group>
   );
 }

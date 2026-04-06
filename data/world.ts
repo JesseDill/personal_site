@@ -342,17 +342,70 @@ function addCloud(blocks: WorldBlock[], x: number, z: number) {
   });
 }
 
-const waterPoolMinX = -9;
-const waterPoolMaxX = -7;
-const waterPoolMinZ = -5;
-const waterPoolMaxZ = -3;
+/** 6×6 cobble well footprint; inner 2×2 is water (no terrain column). */
+const wellMinX = -10;
+const wellMaxX = -5;
+const wellMinZ = -7;
+const wellMaxZ = -2;
+
+const wellWaterMinX = -8;
+const wellWaterMaxX = -7;
+const wellWaterMinZ = -5;
+const wellWaterMaxZ = -4;
+
+/** Inner 4×4 (cobble ring + roof) in XZ: x ∈ [-9,-6], z ∈ [-6,-3]. */
+const wellRingMinX = -9;
+const wellRingMaxX = -6;
+const wellRingMinZ = -6;
+const wellRingMaxZ = -3;
 
 const waterPoolCellKeys = new Set<string>();
-for (let x = waterPoolMinX; x <= waterPoolMaxX; x += 1) {
-  for (let z = waterPoolMinZ; z <= waterPoolMaxZ; z += 1) {
+for (let x = wellWaterMinX; x <= wellWaterMaxX; x += 1) {
+  for (let z = wellWaterMinZ; z <= wellWaterMaxZ; z += 1) {
     waterPoolCellKeys.add(`${x}:${z}`);
   }
 }
+
+function isWellWaterCell(x: number, z: number) {
+  return x >= wellWaterMinX && x <= wellWaterMaxX && z >= wellWaterMinZ && z <= wellWaterMaxZ;
+}
+
+/** Cobble rim at water level: 6×6 minus inner 2×2 water (world y = 0.5 after export). */
+function addWellBaseCobble(blocks: WorldBlock[]) {
+  for (let x = wellMinX; x <= wellMaxX; x += 1) {
+    for (let z = wellMinZ; z <= wellMaxZ; z += 1) {
+      if (isWellWaterCell(x, z)) continue;
+      blocks.push({ position: [x, -0.5, z], material: "cobblestone", solid: true });
+    }
+  }
+}
+
+/** One block above surface: 4×4 ring around 2×2 opening (world y = 1.5). */
+function addWellMidRing(blocks: WorldBlock[]) {
+  for (let x = wellRingMinX; x <= wellRingMaxX; x += 1) {
+    for (let z = wellRingMinZ; z <= wellRingMaxZ; z += 1) {
+      if (isWellWaterCell(x, z)) continue;
+      blocks.push({ position: [x, 0.5, z], material: "cobblestone", solid: true });
+    }
+  }
+}
+
+/** Solid 4×4 roof above 3-high corner posts (world y = 5.5). */
+function addWellRoof(blocks: WorldBlock[]) {
+  for (let x = wellRingMinX; x <= wellRingMaxX; x += 1) {
+    for (let z = wellRingMinZ; z <= wellRingMaxZ; z += 1) {
+      blocks.push({ position: [x, 4.5, z], material: "cobblestone", solid: true });
+    }
+  }
+}
+
+/** Corner cells for 3-block-tall wooden fence posts (matches inner 4×4 cobble ring). */
+export const wellFenceCornerCells: readonly [number, number][] = [
+  [wellRingMinX, wellRingMinZ],
+  [wellRingMaxX, wellRingMinZ],
+  [wellRingMinX, wellRingMaxZ],
+  [wellRingMaxX, wellRingMaxZ],
+];
 
 const farmMinX = 8;
 const farmMaxX = 10;
@@ -435,6 +488,10 @@ function buildWorldBlocks() {
   addPerimeterWalls(blocks);
   addSpawnBillboard(blocks);
 
+  addWellBaseCobble(blocks);
+  addWellMidRing(blocks);
+  addWellRoof(blocks);
+
   // Showcase row in front of spawn (z=4); cubes use instanced voxels — door/stairs mount in GameScene.
   blocks.push({ position: [-1, 0.5, 4], material: "glass", solid: true });
   blocks.push({ position: [0, 0.5, 4], material: "woodPlanks", solid: true });
@@ -483,8 +540,8 @@ export const worldAuthoredCrops = new Set<string>([
 
 export const worldWaterSources: WaterSource[] = (() => {
   const sources: WaterSource[] = [];
-  for (let x = waterPoolMinX; x <= waterPoolMaxX; x += 1) {
-    for (let z = waterPoolMinZ; z <= waterPoolMaxZ; z += 1) {
+  for (let x = wellWaterMinX; x <= wellWaterMaxX; x += 1) {
+    for (let z = wellWaterMinZ; z <= wellWaterMaxZ; z += 1) {
       sources.push({ position: [x, 0.5, z] });
     }
   }

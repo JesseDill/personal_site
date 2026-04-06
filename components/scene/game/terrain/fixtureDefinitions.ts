@@ -1,4 +1,5 @@
 import type { WorldMaterial } from "@/data/world";
+import { wellFenceCornerCells } from "@/data/world";
 import type { FixtureKind, InventoryMaterial, PlacedFixture, SolidSegment } from "../types";
 
 export type ShowcaseFixtureDefinition = {
@@ -59,30 +60,21 @@ export const showcaseFixtures: ShowcaseFixtureDefinition[] = [
     breakPosition: [2, 1.25, 3],
     physicsSegments: [{ bottom: 1.0, top: 1.5, cellX: 2, cellZ: 3, blockKey: "2:1.25:3" }],
   },
-  {
-    primaryId: "fx:fence:-3:3",
-    fixtureKind: "fence",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenFence",
-    breakPosition: [-3, 1.5, 3],
-    physicsSegments: [{ bottom: 1.0, top: 2.0, cellX: -3, cellZ: 3, blockKey: "-3:1.5:3" }],
-  },
-  {
-    primaryId: "fx:fence:-2:3",
-    fixtureKind: "fence",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenFence",
-    breakPosition: [-2, 1.5, 3],
-    physicsSegments: [{ bottom: 1.0, top: 2.0, cellX: -2, cellZ: 3, blockKey: "-2:1.5:3" }],
-  },
-  {
-    primaryId: "fx:fence:-1:3",
-    fixtureKind: "fence",
-    terrainMaterial: "woodPlanks",
-    dropMaterial: "woodenFence",
-    breakPosition: [-1, 1.5, 3],
-    physicsSegments: [{ bottom: 1.0, top: 2.0, cellX: -1, cellZ: 3, blockKey: "-1:1.5:3" }],
-  },
+  ...wellFenceCornerCells.map(([cellX, cellZ]) => {
+    const primaryId = `fx:fence:well:${cellX}:${cellZ}`;
+    return {
+      primaryId,
+      fixtureKind: "fence" as const,
+      terrainMaterial: "woodPlanks" as const,
+      dropMaterial: "woodenFence" as const,
+      breakPosition: [cellX, 3.5, cellZ] as [number, number, number],
+      physicsSegments: [
+        { bottom: 2.0, top: 3.0, cellX, cellZ, blockKey: `${cellX}:2.5:${cellZ}` },
+        { bottom: 3.0, top: 4.0, cellX, cellZ, blockKey: `${cellX}:3.5:${cellZ}` },
+        { bottom: 4.0, top: 5.0, cellX, cellZ, blockKey: `${cellX}:4.5:${cellZ}` },
+      ],
+    } satisfies ShowcaseFixtureDefinition;
+  }),
 ];
 
 const fixtureByPrimaryId = new Map(showcaseFixtures.map((f) => [f.primaryId, f]));
