@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import type { WorldMaterial } from "@/data/world";
-import { worldAuthoredCrops, worldBlocks, worldSky } from "@/data/world";
+import { authoredWorldTorches, worldAuthoredCrops, worldBlocks, worldSky } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
@@ -51,6 +51,7 @@ import { DoorBlock } from "./game/world/DoorBlock";
 import { FenceBlock } from "./game/world/FenceBlock";
 import { SlabBlock } from "./game/world/SlabBlock";
 import { StairBlock } from "./game/world/StairBlock";
+import { TorchBlock } from "./game/world/TorchBlock";
 import { VoxelWorld } from "./game/world/VoxelWorld";
 import { WaterWorld } from "./game/world/WaterWorld";
 import { CropOverlay } from "./game/world/CropOverlay";
@@ -942,6 +943,9 @@ export default function GameScene() {
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
         <WaterWorld cells={waterCells} />
+        {authoredWorldTorches.map((pos, i) => (
+          <TorchBlock key={`torch-${i}-${pos[0]}:${pos[1]}:${pos[2]}`} position={pos} />
+        ))}
         <CropOverlay cropKeys={plantedCrops} visibleBlocks={visibleTerrainBlocks} />
         {!removedTerrainBlockKeys.has("fx:door:home:5:-9") ? (
           <DoorBlock

@@ -669,3 +669,22 @@ export const worldWaterSources: WaterSource[] = (() => {
   }
   return sources;
 })();
+
+/** World-space torch assembly centers (exported Y); height 0.375 centered above surface top. */
+const torchWellBaseY = 1.1875;
+const torchFloorY = 2.1875;
+
+/**
+ * Decorative torches: well outer rim corners; one inside home in front of door (5,-9); farm log corners.
+ */
+export const authoredWorldTorches: readonly [number, number, number][] = [
+  [wellMinX, torchWellBaseY, wellMinZ],
+  [wellMinX, torchWellBaseY, wellMaxZ],
+  [wellMaxX, torchWellBaseY, wellMinZ],
+  [wellMaxX, torchWellBaseY, wellMaxZ],
+  [homeDoorX, torchFloorY, homeDoorZ + 1],
+  [farmMinX, torchFloorY, farmMinZ],
+  [farmMaxX, torchFloorY, farmMinZ],
+  [farmMinX, torchFloorY, farmMaxZ],
+  [farmMaxX, torchFloorY, farmMaxZ],
+];
