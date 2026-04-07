@@ -30,6 +30,7 @@ export const blockBreakHitsRequired = {
   researchAccent: 10,
   contactAccent: 10,
   farmland: 4,
+  torch: 1,
 } satisfies Record<Exclude<WorldMaterial, "cloud">, number>;
 
 export const unbreakableTerrainMaterials = new Set<Exclude<WorldMaterial, "cloud">>([

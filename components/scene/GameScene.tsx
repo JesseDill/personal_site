@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { interactionContent, type InteractionId } from "@/data/interactions";
 import type { WorldMaterial } from "@/data/world";
-import { authoredWorldTorches, worldAuthoredCrops, worldBlocks, worldSky } from "@/data/world";
+import { worldAuthoredCrops, worldBlocks, worldSky } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
 import { healthConfig } from "./game/config/health";
 import { hungerConfig } from "./game/config/hunger";
@@ -40,6 +40,7 @@ import type { BreakableTerrainHit, DroppedBlockItem, InventoryMaterial, Inventor
 import { getTerrainBlockKey } from "./game/terrain/blockKeys";
 import {
   getFixtureDropMaterial,
+  getTorchesDetachedBySupportBlockKey,
   resolveFixtureRemovalKeys,
   showcaseFixtures,
 } from "./game/terrain/fixtureDefinitions";
@@ -468,6 +469,31 @@ export default function GameScene() {
       return;
     }
 
+    const torchesOnSupport = getTorchesDetachedBySupportBlockKey(block.blockKey, placedFixturesRef.current);
+    if (torchesOnSupport.showcase.length > 0) {
+      setRemovedTerrainBlockKeys((current) => {
+        const next = new Set(current);
+        for (const t of torchesOnSupport.showcase) {
+          for (const key of t.removalKeys) {
+            next.add(key);
+          }
+        }
+        return next;
+      });
+    }
+    if (torchesOnSupport.placed.length > 0) {
+      const removeTorchIds = new Set(torchesOnSupport.placed.map((p) => p.primaryId));
+      setPlacedFixtures((prev) => prev.filter((p) => !removeTorchIds.has(p.primaryId)));
+    }
+    for (const t of torchesOnSupport.showcase) {
+      if (t.dropMaterial) {
+        pushDroppedItem(t.dropMaterial, t.breakPosition, block.blockKey);
+      }
+    }
+    for (const p of torchesOnSupport.placed) {
+      pushDroppedItem(p.dropMaterial, p.breakPosition, block.blockKey);
+    }
+
     if (placedTerrainBlocksRef.current.some((entry) => getTerrainBlockKey(entry.position) === block.blockKey)) {
       setPlacedTerrainBlocks((current) => current.filter((entry) => getTerrainBlockKey(entry.position) !== block.blockKey));
     } else {
@@ -709,6 +735,15 @@ export default function GameScene() {
         setPlacedFixtures((prev) => [...prev, fixture]);
         return;
       }
+
+      if (material === "torch") {
+        const torchBaseY = adjacentBlockPosition[1] - 0.5;
+        const fixture = createPlacedFixture("torch", cx, cz, 0, torchBaseY);
+        if (!areFixtureSegmentsPlaceable(snapshot, fixture.physicsSegments)) return;
+        decrementSelectedHotbarStack(material);
+        setPlacedFixtures((prev) => [...prev, fixture]);
+        return;
+      }
     },
     [decrementSelectedHotbarStack, getOccupancySnapshot, setPlacedFixtures, setPlacedTerrainBlocks],
   );
@@ -943,9 +978,19 @@ export default function GameScene() {
         />
         <VoxelWorld blocks={visibleTerrainBlocks} />
         <WaterWorld cells={waterCells} />
-        {authoredWorldTorches.map((pos, i) => (
-          <TorchBlock key={`torch-${i}-${pos[0]}:${pos[1]}:${pos[2]}`} position={pos} />
-        ))}
+        {showcaseFixtures
+          .filter((f) => f.fixtureKind === "torch")
+          .map((f) =>
+            !removedTerrainBlockKeys.has(f.primaryId) ? (
+              <TorchBlock
+                key={f.primaryId}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
+              />
+            ) : null,
+          )}
         <CropOverlay cropKeys={plantedCrops} visibleBlocks={visibleTerrainBlocks} />
         {!removedTerrainBlockKeys.has("fx:door:home:5:-9") ? (
           <DoorBlock
@@ -1036,6 +1081,17 @@ export default function GameScene() {
                 breakPosition={f.breakPosition}
                 rotationY={f.rotationY}
                 isOpen={Boolean(f.isOpen)}
+              />
+            );
+          }
+          if (f.fixtureKind === "torch") {
+            return (
+              <TorchBlock
+                key={f.primaryId}
+                position={f.breakPosition}
+                fixturePrimaryId={f.primaryId}
+                terrainMaterial={f.terrainMaterial}
+                breakPosition={f.breakPosition}
               />
             );
           }

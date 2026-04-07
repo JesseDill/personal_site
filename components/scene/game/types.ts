@@ -10,7 +10,8 @@ export type InventoryMaterial =
   | "woodenSlab"
   | "woodenStair"
   | "woodenFence"
-  | "woodenDoor";
+  | "woodenDoor"
+  | "torch";
 
 export type SolidSegment = {
   bottom: number;
@@ -20,7 +21,7 @@ export type SolidSegment = {
   blockKey: string;
 };
 
-export type FixtureKind = "door" | "stair" | "slab" | "fence";
+export type FixtureKind = "door" | "stair" | "slab" | "fence" | "torch";
 
 /** Player-placed slab / stair / fence / door (runtime state). */
 export type PlacedFixture = {

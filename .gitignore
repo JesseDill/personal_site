@@ -4,3 +4,4 @@ npm-debug.log*
 out/
 .DS_Store
 tsconfig.tsbuildinfo
+.cursor/

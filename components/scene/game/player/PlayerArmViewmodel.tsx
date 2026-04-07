@@ -10,6 +10,54 @@ import { armRenderFlags } from "../materials/armMaterials";
 import { useArmTextures } from "../materials/useArmTextures";
 import type { InventoryMaterial } from "../types";
 
+/** Hand torch: one tilt group contains shaft, flame mesh, and point light so they stay rigid. */
+function HeldTorchRigidAssembly({
+  held_block_position,
+  held_block_rotation,
+  held_block_scale,
+  commonMat,
+}: {
+  held_block_position: [number, number, number];
+  held_block_rotation: [number, number, number];
+  held_block_scale: number;
+  commonMat: JSX.Element;
+}) {
+  const torchTipOffset: [number, number, number] = [0.08, 0.65, -0.22];
+  const torchTipTilt: [number, number, number] = [-.5, -.7, -0.42];
+  const shaftY = -0.1;
+  const shaftH = 0.34;
+  const flameH = 0.125;
+  const shaftHalfH = shaftH / 2;
+  const flameHalfH = flameH / 2;
+  /** Flame bottom meets shaft top (no visible gap in hand view). */
+  const flameY = shaftY + shaftHalfH + flameHalfH;
+  /** Slightly above flame cube top, on shaft axis — matches rigid assembly with meshes. */
+  const lightLocalY = flameY + flameHalfH + 0.02;
+
+  return (
+    <group position={held_block_position} rotation={held_block_rotation} scale={held_block_scale * 1.45} renderOrder={6}>
+      <group position={torchTipOffset} rotation={torchTipTilt}>
+        <mesh frustumCulled={false} position={[0, shaftY, 0]}>
+          <boxGeometry args={[0.125, shaftH, 0.125]} />
+          {commonMat}
+        </mesh>
+        <mesh frustumCulled={false} position={[0, flameY, 0]}>
+          <boxGeometry args={[0.125, flameH, 0.125]} />
+          <meshBasicMaterial color="#ffcc88" toneMapped={false} depthTest depthWrite />
+        </mesh>
+        <pointLight
+          position={[0, lightLocalY, 0]}
+          color="#ffcc88"
+          intensity={0.9}
+          distance={7}
+          decay={1}
+          castShadow={false}
+        />
+      </group>
+    </group>
+  );
+}
+
 function HeldItemMesh({
   material,
   faceTexturesByMaterial,
@@ -142,6 +190,17 @@ function HeldItemMesh({
     );
   }
 
+  if (cfg.renderKind === "torch") {
+    return (
+      <HeldTorchRigidAssembly
+        held_block_position={held_block_position}
+        held_block_rotation={held_block_rotation}
+        held_block_scale={held_block_scale}
+        commonMat={commonMat}
+      />
+    );
+  }
+
   return null;
 }
 
@@ -229,7 +288,7 @@ export function PlayerArmViewmodel({
     <>
       <ambientLight intensity={1} />
       <group ref={armRef} position={[0.88, -0.96, 0]} rotation={arm_rotation} scale={1.45}>
-        <group visible={!heldInventoryMaterial}>
+        <group visible={!heldInventoryMaterial || (!!heldInventoryMaterial && collectedInventoryConfig[heldInventoryMaterial].renderKind === "torch")}>
           <mesh frustumCulled={false} position={[0.02, -0.24, -0.006]}>
             <boxGeometry args={[0.29, 1.04, 0.29]} />
             {armTextures.skin.map((texture, index) => (

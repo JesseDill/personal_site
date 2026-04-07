@@ -4,7 +4,7 @@ import { cubeFaceOrder } from "../materials/types";
 import { assetPath } from "@/lib/assetPrefix";
 
 /** How an item is drawn in HUD icon, dropped-item mesh, and first-person hand. */
-export type InventoryItemRenderKind = "voxelCube" | "sprite" | "slab" | "stair" | "fence" | "door";
+export type InventoryItemRenderKind = "voxelCube" | "sprite" | "slab" | "stair" | "fence" | "door" | "torch";
 
 export type CollectedInventoryItemConfig = {
   label: string;
@@ -58,6 +58,11 @@ export const collectedInventoryConfig = {
     label: "Wood Door",
     renderKind: "door",
     texturePath: doorPath,
+  },
+  torch: {
+    label: "Torch",
+    renderKind: "torch",
+    texturePath: assetPath("/textures/world/wood-planks.svg"),
   },
 } satisfies Record<InventoryMaterial, CollectedInventoryItemConfig>;
 

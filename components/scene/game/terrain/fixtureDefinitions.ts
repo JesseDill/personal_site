@@ -1,5 +1,5 @@
 import type { WorldMaterial } from "@/data/world";
-import { wellFenceCornerCells } from "@/data/world";
+import { authoredWorldTorches, wellFenceCornerCells } from "@/data/world";
 import type { FixtureKind, InventoryMaterial, PlacedFixture, SolidSegment } from "../types";
 
 export type ShowcaseFixtureDefinition = {
@@ -61,6 +61,20 @@ export const showcaseFixtures: ShowcaseFixtureDefinition[] = [
       ],
     } satisfies ShowcaseFixtureDefinition;
   }),
+  ...authoredWorldTorches.map(([x, y, z], i) => {
+    const cx = Math.round(x);
+    const cz = Math.round(z);
+    return {
+      primaryId: `fx:torch:${cx}:${cz}:${i}`,
+      fixtureKind: "torch" as const,
+      terrainMaterial: "torch" as const,
+      dropMaterial: "torch" as const,
+      breakPosition: [x, y, z] as [number, number, number],
+      physicsSegments: [
+        { bottom: y - 0.1875, top: y + 0.1875, cellX: cx, cellZ: cz, blockKey: `${cx}:${y}:${cz}` },
+      ],
+    } satisfies ShowcaseFixtureDefinition;
+  }),
 ];
 
 const fixtureByPrimaryId = new Map(showcaseFixtures.map((f) => [f.primaryId, f]));
@@ -74,6 +88,49 @@ for (const f of showcaseFixtures) {
 
 export function getShowcaseFixtureByPrimaryId(primaryId: string): ShowcaseFixtureDefinition | undefined {
   return fixtureByPrimaryId.get(primaryId);
+}
+
+type TorchSupportFixture = { fixtureKind: FixtureKind; physicsSegments: SolidSegment[] };
+
+/**
+ * Terrain block key (voxel center) of the full cell the torch rests on.
+ * Assumes the torch segment `bottom` is the support surface top and voxels are 1 unit tall (center ± 0.5).
+ */
+export function getTorchSupportTerrainBlockKey(fixture: TorchSupportFixture): string | null {
+  if (fixture.fixtureKind !== "torch") return null;
+  const seg = fixture.physicsSegments[0];
+  if (!seg) return null;
+  const supportCenterY = seg.bottom - 0.5;
+  return `${seg.cellX}:${supportCenterY}:${seg.cellZ}`;
+}
+
+export type TorchDetachedBySupport = {
+  primaryId: string;
+  removalKeys: string[];
+  dropMaterial: InventoryMaterial | null;
+  breakPosition: [number, number, number];
+};
+
+/** Torches (showcase + player-placed) sitting on the given terrain block — for cascade when support breaks. */
+export function getTorchesDetachedBySupportBlockKey(
+  supportBlockKey: string,
+  placedFixtures: PlacedFixture[],
+): { showcase: TorchDetachedBySupport[]; placed: PlacedFixture[] } {
+  const showcase: TorchDetachedBySupport[] = [];
+  for (const f of showcaseFixtures) {
+    if (f.fixtureKind !== "torch") continue;
+    if (getTorchSupportTerrainBlockKey(f) !== supportBlockKey) continue;
+    showcase.push({
+      primaryId: f.primaryId,
+      removalKeys: [f.primaryId, ...f.physicsSegments.map((s) => s.blockKey)],
+      dropMaterial: f.dropMaterial,
+      breakPosition: f.breakPosition,
+    });
+  }
+  const placed = placedFixtures.filter(
+    (f) => f.fixtureKind === "torch" && getTorchSupportTerrainBlockKey(f) === supportBlockKey,
+  );
+  return { showcase, placed };
 }
 
 /** Keys to add to `removedTerrainBlockKeys` when a fixture is fully broken (primary + all physics segment keys). */

@@ -127,6 +127,18 @@ function InventoryItemPreviewScene({
           <meshStandardMaterial {...matProps} />
         </mesh>
       ) : null}
+      {cfg.renderKind === "torch" ? (
+        <group rotation={[0.2, 0.5, 0]} scale={0.7}>
+          <mesh position={[0, -0.15, 0]}>
+            <boxGeometry args={[0.25, 0.5, 0.25]} />
+            <meshStandardMaterial {...matProps} />
+          </mesh>
+          <mesh position={[0, 0.175, 0]}>
+            <boxGeometry args={[0.25, 0.15, 0.25]} />
+            <meshStandardMaterial color="#ffcc88" emissive="#ffcc88" emissiveIntensity={0.75} roughness={0.9} metalness={0} toneMapped={false} />
+          </mesh>
+        </group>
+      ) : null}
     </>
   );
 }

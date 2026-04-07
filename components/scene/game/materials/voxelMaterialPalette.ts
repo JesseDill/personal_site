@@ -133,6 +133,7 @@ export const voxelMaterialPalette = {
     uiColor: "#6b4226",
     roughness: 1,
   },
+  torch: { textures: { all: assetPath("/textures/world/wood-planks.svg") }, uiColor: "#ffcc88", roughness: 0.95 },
   cloud: { textures: { all: assetPath("/textures/world/cloud.svg") }, uiColor: "#f8fafc", roughness: 1, metalness: 0.02 },
 } satisfies VoxelMaterialPalette;
 

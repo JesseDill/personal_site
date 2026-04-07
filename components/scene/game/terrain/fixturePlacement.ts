@@ -15,6 +15,7 @@ export function physicsSegmentsForFixture(
   kind: FixtureKind,
   cellX: number,
   cellZ: number,
+  baseY?: number,
 ): SolidSegment[] {
   switch (kind) {
     case "slab":
@@ -28,6 +29,10 @@ export function physicsSegmentsForFixture(
         { bottom: 1.0, top: 2.0, cellX, cellZ, blockKey: `${cellX}:1.5:${cellZ}` },
         { bottom: 2.0, top: 3.0, cellX, cellZ, blockKey: `${cellX}:2.5:${cellZ}` },
       ];
+    case "torch": {
+      const b = baseY ?? 1.0;
+      return [{ bottom: b, top: b + 0.375, cellX, cellZ, blockKey: `${cellX}:${b + 0.1875}:${cellZ}` }];
+    }
     default:
       return [];
   }
@@ -37,6 +42,7 @@ export function breakPositionForFixture(
   kind: FixtureKind,
   cellX: number,
   cellZ: number,
+  baseY?: number,
 ): [number, number, number] {
   switch (kind) {
     case "slab":
@@ -47,6 +53,10 @@ export function breakPositionForFixture(
       return [cellX, 1.5, cellZ];
     case "door":
       return [cellX, 2, cellZ];
+    case "torch": {
+      const b = baseY ?? 1.0;
+      return [cellX, b + 0.1875, cellZ];
+    }
     default:
       return [cellX, 1.5, cellZ];
   }
@@ -57,6 +67,7 @@ const DROP_BY_KIND: Record<FixtureKind, InventoryMaterial> = {
   stair: "woodenStair",
   fence: "woodenFence",
   door: "woodenDoor",
+  torch: "torch",
 };
 
 export function createPlacedFixture(
@@ -64,14 +75,15 @@ export function createPlacedFixture(
   cellX: number,
   cellZ: number,
   rotationY: number,
+  baseY?: number,
 ): PlacedFixture {
   return {
     primaryId: makePlacedFixtureId(),
     fixtureKind: kind,
-    terrainMaterial: "woodPlanks",
+    terrainMaterial: kind === "torch" ? "torch" : "woodPlanks",
     dropMaterial: DROP_BY_KIND[kind],
-    breakPosition: breakPositionForFixture(kind, cellX, cellZ),
-    physicsSegments: physicsSegmentsForFixture(kind, cellX, cellZ),
+    breakPosition: breakPositionForFixture(kind, cellX, cellZ, baseY),
+    physicsSegments: physicsSegmentsForFixture(kind, cellX, cellZ, baseY),
     rotationY,
     texturePath: kind === "door" ? DOOR_TEXTURE : WOOD_PLANKS_TEXTURE,
   };

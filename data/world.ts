@@ -22,6 +22,7 @@ export type WorldMaterial =
   | "researchAccent"
   | "contactAccent"
   | "farmland"
+  | "torch"
   | "cloud";
 
 export type WorldBlock = {

@@ -214,6 +214,21 @@ function DroppedItemVisual({
     );
   }
 
+  if (cfg.renderKind === "torch") {
+    return (
+      <group>
+        <mesh position={[0, -0.06, 0]} castShadow={false} receiveShadow>
+          <boxGeometry args={[0.1, 0.2, 0.1]} />
+          {matStd(primary)}
+        </mesh>
+        <mesh position={[0, 0.06, 0]} castShadow={false} receiveShadow>
+          <boxGeometry args={[0.1, 0.08, 0.1]} />
+          <meshStandardMaterial color="#ffcc88" emissive="#ffcc88" emissiveIntensity={0.75} roughness={0.9} metalness={0} />
+        </mesh>
+      </group>
+    );
+  }
+
   return null;
 }
 
@@ -240,6 +255,7 @@ export function DroppedBlockItems({
         woodenFence: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
         carrot: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/carrot.svg")]),
         woodenDoor: cubeFaceOrder.map(() => texturesByPath[assetPath("/textures/world/door.svg")]),
+        torch: cubeFaceOrder.map((face) => texturesByPath[faceTexturePaths.woodPlanks[face]]),
       }) satisfies Record<DroppedBlockItem["material"], THREE.Texture[]>,
     [texturesByPath],
   );
