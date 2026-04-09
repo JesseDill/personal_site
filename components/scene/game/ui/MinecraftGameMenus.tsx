@@ -1,5 +1,7 @@
 "use client";
 
+import { assetPath } from "@/lib/assetPrefix";
+
 type MinecraftTitleScreenProps = {
   activePanel: boolean;
   onRequestPointerLock: () => void;
@@ -7,9 +9,10 @@ type MinecraftTitleScreenProps = {
 
 /** First visit / after “Quit to title” — centered stone-style panel with device choice. */
 export function MinecraftTitleScreen({ activePanel, onRequestPointerLock }: MinecraftTitleScreenProps) {
+  const titleBackgroundImage = `url(${assetPath("/textures/world/dirt.svg")})`;
   return (
     <>
-      <div className="mc-title-dim" aria-hidden="true" />
+      <div className="mc-title-dim" style={{ backgroundImage: titleBackgroundImage }} aria-hidden="true" />
       <div className="mc-menu-root mc-menu-root--title" data-ui-layer="true" aria-label="Welcome">
         <h1 className="mc-menu-brand">Hi there!</h1>
         <p className="mc-menu-tagline">
@@ -32,7 +35,7 @@ export function MinecraftTitleScreen({ activePanel, onRequestPointerLock }: Mine
             <a className="mc-stone-button mc-stone-button--half" href="#fallback">
               Mobile
             </a>
-          <a className="mc-stone-button mc-stone-button--half" href="mailto:hello@example.com">
+          <a className="mc-stone-button mc-stone-button--half" href="mailto:jessedill123@gmail.com">
             Contact
           </a>
         </div>
@@ -102,7 +105,7 @@ export function MinecraftPauseMenu({ activePanel, onQuitToTitle, onRequestPointe
             <a className="mc-stone-button mc-stone-button--half" href="#fallback">
               Mobile
             </a>
-            <a className="mc-stone-button mc-stone-button--half" href="mailto:hello@example.com">
+            <a className="mc-stone-button mc-stone-button--half" href="mailto:jessedill123@gmail.com">
               Contact
             </a>
           </div>
