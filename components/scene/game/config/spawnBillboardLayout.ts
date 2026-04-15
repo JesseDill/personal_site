@@ -29,12 +29,18 @@ export type IntroTextLayout = {
   font?: string;
 };
 
-/** NVF publication row: GIF left, troika text right (below intro + social row). */
+/** Publication row: images left, troika text right (below intro + social row). */
 export type PublicationsBillboardLayout = {
   position: [number, number, number];
   /** Optional webfont for heading + body; falls back to `introText.font`. */
   font?: string;
   gif: {
+    path: string;
+    width: number;
+    height: number;
+    position: [number, number, number];
+  };
+  nvfGif: {
     path: string;
     width: number;
     height: number;
@@ -97,10 +103,16 @@ export const spawnBillboardLayout: {
     position: [0.55, 3.38, 6.49],
     font: assetPath("/fonts/IBMPlexMono-Light.ttf"),
     gif: {
+      path: assetPath("/textures/world/gavis_paper.png"),
+      width: 1.56,
+      height: 1.56,
+      position: [-1.78, -0.39, 0.08],
+    },
+    nvfGif: {
       path: assetPath("/textures/world/room_uncertainty_visual.png"),
       width: 1.56,
       height: 1.56,
-      position: [-1.78, -0.39, 0.03],
+      position: [-1.78, -1.388, 0.08],
     },
     text: {
       headingFill: "#000000",
@@ -116,9 +128,9 @@ export const spawnBillboardLayout: {
       outlineWidth: 0.001,//0.012,
     },
     body: {
-      position: [-0.9, 0.04, 0.04],
+      position: [-0.9, 0.06, 0.04],
       fontSize: 0.10,
-      maxWidth: 4.15,
+      maxWidth: 4.35,
       lineHeight: 1.24,
       outlineWidth: 0.001,//0.01,
     },

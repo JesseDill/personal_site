@@ -27,6 +27,12 @@ export function BillboardPublicationRow() {
         height={p.gif.height}
         position={p.gif.position}
       />
+      <AnimatedGifPlane
+        src={p.nvfGif.path}
+        width={p.nvfGif.width}
+        height={p.nvfGif.height}
+        position={p.nvfGif.position}
+      />
       <Text
         position={p.heading.position}
         anchorX="left"

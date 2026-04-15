@@ -764,6 +764,9 @@ a {
 }
 
 .fallback-publication-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   justify-content: flex-start;
   align-items: flex-start;
   margin-top: 0.5rem;
@@ -772,22 +775,8 @@ a {
   border-top: 1px solid rgba(0, 65, 130, 0.12);
 }
 
-/* Col 1: title above image (same left edge as kicker + intro text); col 2: body, top-aligned with image */
-.fallback-publication-grid {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 62ch);
-  grid-template-rows: auto auto;
-  column-gap: clamp(1.1rem, 3.2vw, 2.75rem);
-  row-gap: 0.65rem;
-  align-items: start;
-  max-width: 100%;
-}
-
 .fallback-publications-heading {
-  grid-column: 1;
-  grid-row: 1;
   margin: 0;
-  justify-self: start;
   text-align: left;
   font-size: clamp(1rem, 2.4vw, 1.2rem);
   font-weight: 700;
@@ -795,15 +784,20 @@ a {
   color: var(--pub-heading, var(--fb-body));
 }
 
+/* Each paper: image left, text right */
+.fallback-publication-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 62ch);
+  column-gap: clamp(1.1rem, 3.2vw, 2.75rem);
+  align-items: start;
+  max-width: 100%;
+}
+
 .fallback-publication-thumb {
-  grid-column: 1;
-  grid-row: 2;
   align-self: start;
 }
 
 .fallback-publication-copy {
-  grid-column: 2;
-  grid-row: 2;
   align-self: start;
   min-width: 0;
 }
@@ -811,23 +805,7 @@ a {
 @media (max-width: 640px) {
   .fallback-publication-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
     width: 100%;
-  }
-
-  .fallback-publications-heading {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .fallback-publication-thumb {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .fallback-publication-copy {
-    grid-column: 1;
-    grid-row: 3;
   }
 }
 

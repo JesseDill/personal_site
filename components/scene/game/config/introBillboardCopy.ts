@@ -4,9 +4,9 @@ import { getCaretAtPoint } from "troika-three-text";
 
 /** Full string passed to troika `Text` (single source for layout, colors, and hit-testing). */
 export const INTRO_BILLBOARD_TEXT = `Hi, I'm Jesse! \n
-I'm a software engineer under the Road Understanding Team at Waymo, where we build representations that understand the driving elements around the vehicle.
+Currently, I'm a software engineer under the Road Understanding Team at Waymo, iterating on online mapping systems.
 
-Previously, I obtained my Masters's and Bachelor's in Computer Science from Georgia Tech, where I had the privilege of working with Danfei Xu as part of the Robot Learning and Reasoning Lab (RL2).
+Previously, I studied computer science at Georgia Tech, where I had the privilege of working with Danfei Xu as part of the Robot Learning and Reasoning Lab (RL2).
 
 Largely, I'm interested in the intersection of robotics, vision, and graphics.`;
 

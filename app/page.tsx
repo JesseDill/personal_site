@@ -1,7 +1,12 @@
 import GameScene from "@/components/scene/GameScene";
 import { renderLinkedBillboardText } from "@/components/classic/renderLinkedBillboardText";
 import { INTRO_BILLBOARD_TEXT, INTRO_TEXT_LINKS } from "@/components/scene/game/config/introBillboardCopy";
-import { PUBLICATION_BODY_TEXT, PUBLICATION_TEXT_LINKS } from "@/components/scene/game/config/publicationsBillboardCopy";
+import {
+  GAVIS_BODY_TEXT,
+  GAVIS_TEXT_LINKS,
+  NVF_BODY_TEXT,
+  NVF_TEXT_LINKS,
+} from "@/components/scene/game/config/publicationsBillboardCopy";
 import {
   githubProfileUrl,
   googleScholarProfileUrl,
@@ -89,8 +94,9 @@ export default function HomePage() {
             </div>
 
             <div className="fallback-spawn-row fallback-publication-row" style={publicationRowStyle}>
+              <h2 className="fallback-publications-heading">Publications</h2>
+
               <div className="fallback-publication-grid">
-                <h2 className="fallback-publications-heading">Publications</h2>
                 <div className="fallback-publication-thumb">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={pub.gif.path} alt="" width={512} height={512} />
@@ -98,9 +104,25 @@ export default function HomePage() {
                 <div className="fallback-publication-copy">
                   <div className="fallback-spawn-intro-body fallback-publication-body">
                     {renderLinkedBillboardText(
-                      PUBLICATION_BODY_TEXT,
-                      PUBLICATION_TEXT_LINKS.map(({ start, end, href }) => ({ start, end, href })),
-                      "pub",
+                      GAVIS_BODY_TEXT,
+                      GAVIS_TEXT_LINKS.map(({ start, end, href }) => ({ start, end, href })),
+                      "gavis",
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="fallback-publication-grid">
+                <div className="fallback-publication-thumb">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pub.nvfGif.path} alt="" width={512} height={512} />
+                </div>
+                <div className="fallback-publication-copy">
+                  <div className="fallback-spawn-intro-body fallback-publication-body">
+                    {renderLinkedBillboardText(
+                      NVF_BODY_TEXT,
+                      NVF_TEXT_LINKS.map(({ start, end, href }) => ({ start, end, href })),
+                      "nvf",
                     )}
                   </div>
                 </div>
