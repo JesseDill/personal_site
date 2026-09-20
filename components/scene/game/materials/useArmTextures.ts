@@ -1,18 +1,12 @@
-import { useTexture } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { usePixelTextures } from "./usePixelTextures";
+import { useMemo } from "react";
 import * as THREE from "three";
 import { armFaceTexturePaths, armTextureDefinitions, uniqueArmTexturePaths } from "./armMaterials";
-import { configurePixelTexture } from "./configurePixelTexture";
 import { cubeFaceOrder } from "./types";
 
 export function useArmTextures() {
-  const textures = useTexture(uniqueArmTexturePaths) as THREE.Texture[];
+  const textures = usePixelTextures(uniqueArmTexturePaths) as THREE.Texture[];
 
-  useEffect(() => {
-    textures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [textures]);
 
   const texturesByPath = useMemo(
     () =>

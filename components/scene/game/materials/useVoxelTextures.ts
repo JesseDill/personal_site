@@ -1,17 +1,11 @@
-import { useTexture } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { usePixelTextures } from "./usePixelTextures";
+import { useMemo } from "react";
 import * as THREE from "three";
-import { configurePixelTexture } from "./configurePixelTexture";
 import { uniqueVoxelTexturePaths } from "./voxelMaterialPalette";
 
 export function useVoxelTextures() {
-  const textures = useTexture(uniqueVoxelTexturePaths) as THREE.Texture[];
+  const textures = usePixelTextures(uniqueVoxelTexturePaths) as THREE.Texture[];
 
-  useEffect(() => {
-    textures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [textures]);
 
   return useMemo(
     () =>

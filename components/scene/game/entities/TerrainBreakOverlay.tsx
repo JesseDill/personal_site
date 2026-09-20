@@ -1,13 +1,12 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
+import { usePixelTextures } from "../materials/usePixelTextures";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { blockBreakHitsRequired, blockBreakTexturePaths, unbreakableTerrainMaterials } from "../config/mining";
 import { terrainImpactConfig } from "../config/particles";
 import { cubeFaceOrder } from "../materials/types";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import type { BreakableTerrainHit, TerrainBreakOverlayState } from "../types";
 import { isTerrainRayHitSuppressed, type TerrainOccupancySnapshot } from "../terrain/occupancy";
 import { getCenterTerrainHit } from "../terrain/raycastTerrain";
@@ -34,14 +33,9 @@ export function TerrainBreakOverlay({
 }) {
   const { camera, scene } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const textures = useTexture(Array.from(blockBreakTexturePaths)) as THREE.Texture[];
+  const textures = usePixelTextures(Array.from(blockBreakTexturePaths)) as THREE.Texture[];
   const [overlayState, setOverlayState] = useState<TerrainBreakOverlayState | null>(null);
 
-  useEffect(() => {
-    textures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [textures]);
 
   useEffect(() => {
     if (!enabled || trigger === 0) return;

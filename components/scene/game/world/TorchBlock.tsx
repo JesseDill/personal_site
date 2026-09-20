@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import type { WorldMaterial } from "@/data/world";
 import * as THREE from "three";
+import { SharedBoxGeometry } from "../materials/sharedResources";
 
 /** Footprint (original cube width/depth). */
 const TORCH_W = 0.125;
@@ -81,10 +82,10 @@ export function TorchBlock({ position, fixturePrimaryId, terrainMaterial, breakP
   return (
     <group position={position}>
       <mesh castShadow receiveShadow position={[0, shaftCenterY, 0]} material={shaftMaterial} userData={hitUserData ?? {}}>
-        <boxGeometry args={[TORCH_W, SHAFT_HEIGHT, TORCH_D]} />
+        <SharedBoxGeometry args={[TORCH_W, SHAFT_HEIGHT, TORCH_D]} />
       </mesh>
       <mesh castShadow receiveShadow position={[0, flameCenterY, 0]} material={flameMaterial} userData={hitUserData ?? {}}>
-        <boxGeometry args={[TORCH_W, FLAME_HEIGHT, TORCH_D]} />
+        <SharedBoxGeometry args={[TORCH_W, FLAME_HEIGHT, TORCH_D]} />
       </mesh>
       <pointLight
         position={[0, lightY, 0]}

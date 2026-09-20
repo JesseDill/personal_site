@@ -1,11 +1,10 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
+import { usePixelTextures } from "../materials/usePixelTextures";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { WorldBlock } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import { getTerrainBlockKey } from "../terrain/blockKeys";
 
 const carrotTextureUrl = assetPath("/textures/world/carrot.svg");
@@ -59,11 +58,8 @@ export function CropOverlay({
   cropKeys: ReadonlySet<string>;
   visibleBlocks: WorldBlock[];
 }) {
-  const texture = useTexture(carrotTextureUrl) as THREE.Texture;
+  const texture = usePixelTextures(carrotTextureUrl) as THREE.Texture;
 
-  useEffect(() => {
-    configurePixelTexture(texture);
-  }, [texture]);
 
   const material = useMemo(
     () =>

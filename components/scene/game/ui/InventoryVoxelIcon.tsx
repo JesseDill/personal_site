@@ -1,12 +1,10 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
+import { usePixelTextures } from "../materials/usePixelTextures";
 import { Canvas } from "@react-three/fiber";
-import { useEffect } from "react";
 import type { Texture } from "three";
 import * as THREE from "three";
 import { collectedInventoryConfig } from "../config/inventory";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import type { InventoryMaterial } from "../types";
 
 function InventoryItemPreviewScene({
@@ -16,14 +14,9 @@ function InventoryItemPreviewScene({
   material: InventoryMaterial;
   texturePaths: string[];
 }) {
-  const textures = useTexture(texturePaths) as Texture[];
+  const textures = usePixelTextures(texturePaths) as Texture[];
   const cfg = collectedInventoryConfig[material];
 
-  useEffect(() => {
-    textures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [textures]);
 
   const primary = textures[0];
 

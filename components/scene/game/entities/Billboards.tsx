@@ -8,7 +8,7 @@ import {
   INTRO_TEXT_COLOR_RANGES,
   resolveIntroTextLinkAtHit,
 } from "../config/introBillboardCopy";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
+import { usePixelTextures } from "../materials/usePixelTextures";
 
 const ENABLE_TEXTURE_READBACK_WARMUP = true;
 
@@ -25,11 +25,10 @@ export function BillboardSocialSign({
   position: [number, number, number];
   isActive: boolean;
 }) {
-  const texture = useTexture(texturePath);
+  const texture = usePixelTextures(texturePath);
   const signFaceSize = 0.45;
 
   useEffect(() => {
-    configurePixelTexture(texture);
 
     const image = texture.image as
       | {

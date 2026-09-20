@@ -1,11 +1,11 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
+import { usePixelTextures } from "../materials/usePixelTextures";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import { SharedBoxGeometry } from "../materials/sharedResources";
 import type { WorldMaterial } from "@/data/world";
 import { assetPath } from "@/lib/assetPrefix";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import { DOOR_Y_MAX, DOOR_Y_MIN, getDoorMeshSpec } from "../terrain/doorCollision";
 
 type DoorBlockProps = {
@@ -33,11 +33,8 @@ export function DoorBlock({
   doorYMin = DOOR_Y_MIN,
   doorYMax = DOOR_Y_MAX,
 }: DoorBlockProps) {
-  const texture = useTexture(assetPath("/textures/world/door.svg")) as THREE.Texture;
+  const texture = usePixelTextures(assetPath("/textures/world/door.svg")) as THREE.Texture;
 
-  useEffect(() => {
-    configurePixelTexture(texture);
-  }, [texture]);
 
   const material = useMemo(
     () =>
@@ -76,7 +73,7 @@ export function DoorBlock({
   return (
     <group position={position} userData={hitUserData}>
       <mesh castShadow receiveShadow material={material} position={offset} userData={hitUserData}>
-        <boxGeometry args={size} />
+        <SharedBoxGeometry args={size} />
       </mesh>
     </group>
   );

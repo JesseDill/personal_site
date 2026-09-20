@@ -1,22 +1,16 @@
-import { useTexture } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { usePixelTextures } from "../materials/usePixelTextures";
+import { useMemo } from "react";
 import * as THREE from "three";
 import {
   collectedInventoryConfig,
   collectedInventoryMaterials,
   hotbarPreviewTexturePaths,
 } from "../config/inventory";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import type { InventoryMaterial } from "../types";
 
 export function useHotbarPreviewTextures() {
-  const textures = useTexture(hotbarPreviewTexturePaths) as THREE.Texture[];
+  const textures = usePixelTextures(hotbarPreviewTexturePaths) as THREE.Texture[];
 
-  useEffect(() => {
-    textures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [textures]);
 
   const texturesByPath = useMemo(
     () =>
