@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
   <rect width="16" height="16" fill="#8e6438" />
   <rect y="1" width="16" height="2" fill="#a77344" />
   <rect x="2" y="0" width="1" height="16" fill="#6d4924" />

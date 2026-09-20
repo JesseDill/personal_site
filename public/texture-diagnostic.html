@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Texture upload diagnostic</title>
+<style>body{font:16px system-ui;background:#eee;color:#111;padding:24px}main{display:flex;gap:20px;flex-wrap:wrap}article{background:white;padding:16px;width:240px}canvas{width:224px;height:224px;image-rendering:pixelated}pre{white-space:pre-wrap;font-size:12px}</style>
+<h1>Texture upload diagnostic</h1><p>Same grass asset, three upload paths. Repository SVG and raster canvas should show green grass. The unsized control reproduces the original browser bug and may appear black. Runs locally in your browser; sends no diagnostics.</p><main></main><pre id="environment"></pre>
+<script type="module">
+const src = await (await fetch('./textures/world/grass-top.svg')).text();
+const unsized = src.replace(/<svg\b[^>]*>/, root => root.replace(/\s(?:width|height)="[^"]*"/g, ''));
+const sized = unsized.replace('<svg ', '<svg width="16" height="16" ');
+const variants = [['Repository SVG',src],['Unsized SVG control',unsized],['Raster canvas',sized]];
+document.querySelector('#environment').textContent=navigator.userAgent;
+for(const [name,svg] of variants){
+ const card=document.createElement('article');const title=document.createElement('h2');title.textContent=name;card.append(title);
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=224;card.append(canvas);const info=document.createElement('pre');card.append(info);document.querySelector('main').append(card);
+ try{
+ const gl=canvas.getContext('webgl2');if(!gl)throw Error('WebGL2 unavailable');
+ const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
+ const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,`#version 300 es
+ out vec2 uv;void main(){vec2 positions[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));vec2 q=positions[gl_VertexID];uv=(q+1.)*.5;gl_Position=vec4(q,0.,1.);}`));
+ gl.attachShader(p,compile(gl.FRAGMENT_SHADER,`#version 300 es
+ precision highp float;in vec2 uv;uniform sampler2D tex;out vec4 color;void main(){color=texture(tex,vec2(uv.x,1.-uv.y));}`));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+ const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));const img=new Image();img.src=url;await img.decode();let source=img;
+ if(name==='Raster canvas'){source=document.createElement('canvas');source.width=source.height=16;source.getContext('2d').drawImage(img,0,0,16,16);}
+ const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_NEAREST);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);gl.generateMipmap(gl.TEXTURE_2D);gl.drawArrays(gl.TRIANGLES,0,3);
+ const pixel=new Uint8Array(4);gl.readPixels(112,112,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);info.textContent=JSON.stringify({naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,centerPixel:[...pixel],glError:gl.getError()},null,2);URL.revokeObjectURL(url);
+ }catch(e){info.textContent=String(e);}
+}
+</script>
