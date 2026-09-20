@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "verify:optimizations": "node scripts/verify-optimizations.cjs",
+    "preview": "node scripts/preview-export.cjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

@@ -15,3 +15,8 @@ npx --yes serve@latest /tmp/ghpages-preview
 
 Then open `http://localhost:3000/personal_site/` (port shown in the terminal).
 
+### Performance verification
+
+- Run `npm run verify:optimizations` for the terrain meshing, voxel picking, chunk invalidation, fixture picking, water sleeping, and texture initialization checks.
+- Run `npm run build`, then `npm run preview` for the exported production site.
+- Add `?perf=1` to the site URL to show the local performance overlay. It reports frame times, renderer work, memory counters, and instrumented CPU timings; diagnostics stay disabled for normal visitors.
