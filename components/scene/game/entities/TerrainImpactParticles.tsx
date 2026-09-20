@@ -26,7 +26,7 @@ export function TerrainImpactParticles({
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const meshRefs = useRef({} as Record<Exclude<WorldMaterial, "cloud">, THREE.InstancedMesh | null>);
-  const poolsRef = useRef(
+  const poolsRef = useRef(useMemo(() =>
     Object.fromEntries(
       terrainImpactMaterials.map((material) => [
         material,
@@ -37,6 +37,7 @@ export function TerrainImpactParticles({
           angularVelocities: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => new THREE.Vector3()),
           lifetimes: Array.from({ length: terrainImpactConfig.maxParticlesPerMaterial }, () => ({ age: 1, ttl: 0 })),
           nextParticle: 0,
+          active: new Set<number>(),
         },
       ]),
     ) as Record<
@@ -48,9 +49,10 @@ export function TerrainImpactParticles({
         angularVelocities: THREE.Vector3[];
         lifetimes: Array<{ age: number; ttl: number }>;
         nextParticle: number;
+        active: Set<number>;
       }
     >,
-  );
+  []));
   const spawnOriginRef = useRef(new THREE.Vector3());
   const spawnNormalRef = useRef(new THREE.Vector3(0, 1, 0));
   const tangentRef = useRef(new THREE.Vector3());
@@ -90,6 +92,7 @@ export function TerrainImpactParticles({
         mesh.setMatrixAt(index, dummy.matrix);
       }
 
+      mesh.visible = pool.active.size > 0;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     },
@@ -151,6 +154,7 @@ export function TerrainImpactParticles({
         (Math.random() - 0.5) * terrainImpactConfig.angularVelocity,
       );
 
+      pool.active.add(particleIndex);
       pool.lifetimes[particleIndex] = {
         age: 0,
         ttl: 0.18 + Math.random() * 0.22,
@@ -165,7 +169,7 @@ export function TerrainImpactParticles({
       const pool = poolsRef.current[material];
       let materialNeedsUpdate = false;
 
-      for (let index = 0; index < terrainImpactConfig.maxParticlesPerMaterial; index += 1) {
+      for (const index of pool.active) {
         const lifetime = pool.lifetimes[index];
 
         if (lifetime.age >= lifetime.ttl) {
@@ -175,6 +179,7 @@ export function TerrainImpactParticles({
         lifetime.age += delta;
 
         if (lifetime.age >= lifetime.ttl) {
+          pool.active.delete(index);
           pool.positions[index].set(9999, 9999, 9999);
           materialNeedsUpdate = true;
           continue;
