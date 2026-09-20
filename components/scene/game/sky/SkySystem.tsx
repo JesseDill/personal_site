@@ -1,11 +1,10 @@
 "use client";
 
-import { useTexture } from "@react-three/drei";
+import { usePixelTextures } from "../materials/usePixelTextures";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { worldSky } from "@/data/world";
-import { configurePixelTexture } from "../materials/configurePixelTexture";
 import { createCloudBasePositions, createCloudVoxelGeometry } from "./cloudGeometry";
 import { applyLerpedColor, orbitSkyBody, wrapIntoRange } from "./orbit";
 
@@ -25,12 +24,15 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
   const moonMaterialRef = useRef<THREE.SpriteMaterial>(null);
   const starsMaterialRef = useRef<THREE.PointsMaterial>(null);
   const cloudLayerRefs = useRef<Array<THREE.Group | null>>([]);
-  const skyTextures = useTexture(uniqueSkyTexturePaths) as THREE.Texture[];
+  const skyTextures = usePixelTextures(uniqueSkyTexturePaths) as THREE.Texture[];
   const fogRef = useRef(new THREE.Fog(worldSky.colors.dayFog, worldSky.fogNear, worldSky.fogFar));
   const backgroundColor = useMemo(() => new THREE.Color(worldSky.colors.dayBackground), []);
   const domeColor = useMemo(() => new THREE.Color(worldSky.colors.dayDome), []);
   const hemisphereSkyColor = useMemo(() => new THREE.Color(worldSky.lighting.dayHemisphereColor), []);
   const hemisphereGroundColor = useMemo(() => new THREE.Color(worldSky.lighting.dayGroundColor), []);
+  const sunOrbitState = useMemo(() => ({ angle: 0, position: new THREE.Vector3() }), []);
+  const moonOrbitState = useMemo(() => ({ angle: 0, position: new THREE.Vector3() }), []);
+  const white = useMemo(() => new THREE.Color("#ffffff"), []);
   const directionalColor = useMemo(() => new THREE.Color(worldSky.lighting.sunColor), []);
 
   const texturesByPath = useMemo(
@@ -134,11 +136,6 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
     return values;
   }, []);
 
-  useEffect(() => {
-    skyTextures.forEach((texture) => {
-      configurePixelTexture(texture);
-    });
-  }, [skyTextures]);
 
   useEffect(() => {
     scene.background = backgroundColor;
@@ -164,6 +161,7 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
       worldSky.sun.verticalRadius,
       worldSky.orbit.axis,
       worldSky.orbit.heightOffset,
+      0, sunOrbitState,
     );
     const moonOrbit = orbitSkyBody(
       cycleProgress,
@@ -171,7 +169,7 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
       worldSky.moon.verticalRadius,
       worldSky.orbit.axis,
       worldSky.orbit.heightOffset,
-      Math.PI,
+      Math.PI, moonOrbitState,
     );
 
     const daylightBase = THREE.MathUtils.clamp((Math.sin(sunOrbit.angle) + 0.18) / 1.18, 0, 1);
@@ -221,8 +219,8 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
     cloudMaterials.forEach((material) => {
       if (!material) return;
 
-      material.color.set(worldSky.colors.nightFog).lerp(new THREE.Color("#ffffff"), daylight * 0.88);
-      material.emissive.set(worldSky.colors.nightFog).lerp(new THREE.Color("#ffffff"), daylight * 0.1);
+      material.color.set(worldSky.colors.nightFog).lerp(white, daylight * 0.88);
+      material.emissive.set(worldSky.colors.nightFog).lerp(white, daylight * 0.1);
       material.emissiveIntensity = THREE.MathUtils.lerp(0.04, 0.12, daylight);
     });
 
@@ -264,7 +262,7 @@ export function SkySystem({ ambientLightRef, hemisphereLightRef, directionalLigh
       );
       applyLerpedColor(directionalColor, worldSky.lighting.moonColor, worldSky.lighting.sunColor, daylight);
       directionalLightRef.current.color.copy(directionalColor);
-      directionalLightRef.current.position.copy(sunOrbit.position.clone().normalize().multiplyScalar(42));
+      directionalLightRef.current.position.copy(sunOrbit.position).normalize().multiplyScalar(42);
     }
   });
 

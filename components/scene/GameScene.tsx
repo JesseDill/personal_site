@@ -1,4 +1,6 @@
 "use client";
+import { SceneVisibility } from "./game/performance/SceneVisibility";
+import { PerformanceDiagnostics } from "./game/performance/PerformanceDiagnostics";
 
 import { Hud, PerspectiveCamera, PointerLockControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -111,8 +113,8 @@ const ENABLE_POST_MOUNT_INVALIDATE = true;
 
 function WorldDropOriginSync({ originRef }: { originRef: React.MutableRefObject<WorldDropOrigin | null> }) {
   const { camera } = useThree();
+  const fwd = useMemo(() => new THREE.Vector3(), []);
   useFrame(() => {
-    const fwd = new THREE.Vector3();
     camera.getWorldDirection(fwd);
     fwd.y = 0;
     if (fwd.lengthSq() < 1e-8) {
@@ -440,7 +442,7 @@ export default function GameScene() {
         }
       }
     },
-    [triggerDamageFeedback, pushDroppedItem, setPlacedTerrainBlocks, setRemovedTerrainBlockKeys],
+    [triggerDamageFeedback, pushDroppedItem, placedTerrainBlocksRef, setPlacedTerrainBlocks, setRemovedTerrainBlockKeys],
   );
 
   const removeTerrainBlock = useCallback((block: BreakableTerrainHit) => {
@@ -955,6 +957,8 @@ export default function GameScene() {
           worldCanvasElRef.current = gl.domElement as HTMLCanvasElement;
         }}
       >
+        <PerformanceDiagnostics />
+        <SceneVisibility />
         <SceneRenderStabilizer socialPositions={spawnSocialPositions} />
         <ambientLight ref={ambientLightRef} intensity={worldSky.lighting.dayAmbient} />
         <hemisphereLight
