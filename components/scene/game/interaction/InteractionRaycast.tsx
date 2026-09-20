@@ -5,6 +5,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { InteractionId } from "@/data/interactions";
 import { interactionHoverMaxDistance } from "../config/particles";
+import { intersectPickTargets } from "./pickRegistry";
 import { linkHoverLabelFromHref } from "./linkHoverLabel";
 
 export function InteractionRaycast({
@@ -15,6 +16,7 @@ export function InteractionRaycast({
   pointerNdc?: { x: number; y: number };
 }) {
   const { camera, scene } = useThree();
+  const pointer = useMemo(() => new THREE.Vector2(), []);
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const lastTargetRef = useRef<{ id: InteractionId | null; label: string | null; href: string | null }>({
     id: null,
@@ -23,8 +25,10 @@ export function InteractionRaycast({
   });
 
   useFrame(() => {
-    raycaster.setFromCamera(new THREE.Vector2(pointerNdc?.x ?? 0, pointerNdc?.y ?? 0), camera);
-    const hits = raycaster.intersectObjects(scene.children, true);
+    camera.updateWorldMatrix(true, false);
+    raycaster.setFromCamera(pointer.set(pointerNdc?.x ?? 0, pointerNdc?.y ?? 0), camera);
+    raycaster.far = interactionHoverMaxDistance;
+    const hits = intersectPickTargets(scene, raycaster, "interaction");
 
     let nextTarget: { id: InteractionId | null; label: string | null; href: string | null } = {
       id: null,

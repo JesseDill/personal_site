@@ -1,121 +1,67 @@
 import * as THREE from "three";
-import type { WorldMaterial } from "@/data/world";
+import { worldBlocks, type WorldMaterial } from "@/data/world";
 import type { CenterTerrainHit, FixtureKind } from "../types";
-import { isTerrainRayHitSuppressed } from "./occupancy";
-import type { TerrainOccupancySnapshot } from "./occupancy";
+import { isTerrainRayHitSuppressed, type TerrainOccupancySnapshot } from "./occupancy";
+import { raycastVoxelGrid } from "./gridRaycast";
+import { fixtureData, getPickRegistry } from "../interaction/pickRegistry";
+import { timed, countWork } from "../performance/metrics";
 
-type FixtureHitUserData = {
-  terrainMaterial: Exclude<WorldMaterial, "cloud">;
-  fixturePrimaryId?: string;
-  fixtureBreakPosition?: [number, number, number];
-  fixtureKind?: FixtureKind;
-};
+const baseBlocks = new Map(worldBlocks.map(block => [block.position.join(":"), block]));
+const center = new THREE.Vector2();
+type Cache = { signature: string; occupancy: TerrainOccupancySnapshot; hit: CenterTerrainHit | null };
+const caches = new WeakMap<THREE.Scene, Cache>();
 
-function readFixtureHitUserData(object: THREE.Object3D): FixtureHitUserData | null {
-  let o: THREE.Object3D | null = object;
-  while (o) {
-    const m = o.userData?.terrainMaterial as WorldMaterial | undefined;
-    if (m && m !== "cloud") {
-      return {
-        terrainMaterial: m,
-        fixturePrimaryId: o.userData.fixturePrimaryId as string | undefined,
-        fixtureBreakPosition: o.userData.fixtureBreakPosition as [number, number, number] | undefined,
-        fixtureKind: o.userData.fixtureKind as FixtureKind | undefined,
-      };
+/** Cache only identical rays, occupancy and fixture transforms; clicks after edits stay fresh. */
+export function getCenterTerrainHit(raycaster: THREE.Raycaster, camera: THREE.Camera, scene: THREE.Scene,
+  maxDistance: number, occupancy: TerrainOccupancySnapshot): CenterTerrainHit | null {
+  return timed("picking.terrain", () => {
+    camera.updateWorldMatrix(true, false);
+    raycaster.setFromCamera(center, camera); raycaster.far = maxDistance;
+    const registry = getPickRegistry(scene);
+    const targets = registry.targets("fixture");
+    const parts: (string | number)[] = [maxDistance, registry.version, ...raycaster.ray.origin.toArray(), ...raycaster.ray.direction.toArray()];
+    for (const target of targets) {
+      target.updateWorldMatrix(true, false);
+      // Metadata may change without a scene add/remove (e.g. replacement fixture).
+      parts.push(target.id, ...target.matrixWorld.elements, JSON.stringify(fixtureData(target)));
     }
-    o = o.parent;
-  }
-  return null;
-}
-
-export function getCenterTerrainHit(
-  raycaster: THREE.Raycaster,
-  camera: THREE.Camera,
-  scene: THREE.Scene,
-  maxDistance: number,
-  occupancy: TerrainOccupancySnapshot,
-): CenterTerrainHit | null {
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  const intersects = raycaster.intersectObjects(scene.children, true);
-
-  for (const hit of intersects) {
-    if (hit.distance > maxDistance) break;
-
-    if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
-      const terrainMaterial = hit.object.userData?.terrainMaterial as WorldMaterial | undefined;
-      if (!terrainMaterial || terrainMaterial === "cloud") continue;
-
-      const normal = (hit.face?.normal ?? new THREE.Vector3(0, 1, 0)).clone();
-      const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-      normal.applyMatrix3(normalMatrix).normalize();
-
-      const blockPosition = new THREE.Vector3();
-      const instanceMatrix = new THREE.Matrix4();
-      hit.object.getMatrixAt(hit.instanceId, instanceMatrix);
-      blockPosition.setFromMatrixPosition(instanceMatrix);
-      hit.object.localToWorld(blockPosition);
-
-      const blockKey = `${blockPosition.x}:${blockPosition.y}:${blockPosition.z}`;
+    const signature = parts.join(",");
+    const cached = caches.get(scene);
+    if (cached?.signature === signature && cached.occupancy === occupancy) { countWork("terrainPickCacheHits"); return cached.hit; }
+    const voxel = raycastVoxelGrid(raycaster.ray, maxDistance, key => occupancy.placedBlocksByKey.get(key) ??
+      (occupancy.removedKeys.has(key) ? undefined : baseBlocks.get(key)));
+    countWork("terrainPickQueries"); countWork("pickCandidates", targets.length);
+    const fixtures = raycaster.intersectObjects(targets, false);
+    let result: CenterTerrainHit | null = voxel ? {
+      terrainMaterial: voxel.block.material as Exclude<WorldMaterial,"cloud">,
+      point: voxel.point, normal: voxel.normal, blockPosition: voxel.block.position, blockKey: voxel.blockKey,
+    } : null;
+    for (const hit of fixtures) {
+      if (voxel && hit.distance > voxel.distance) break;
+      const data = fixtureData(hit.object);
+      if (!data) continue;
+      const blockPosition = (data.fixtureBreakPosition ?? hit.object.getWorldPosition(new THREE.Vector3()).toArray()) as [number,number,number];
+      const blockKey = data.fixturePrimaryId ?? blockPosition.join(":");
       if (isTerrainRayHitSuppressed(occupancy, blockKey)) continue;
-
-      return {
-        terrainMaterial,
-        point: hit.point.clone(),
-        normal,
-        blockPosition: [blockPosition.x, blockPosition.y, blockPosition.z] as [number, number, number],
-        blockKey,
-      } satisfies CenterTerrainHit;
+      const normal = (hit.face?.normal ?? new THREE.Vector3(0,1,0)).clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+      result = { terrainMaterial:data.terrainMaterial, point:hit.point.clone(), normal, blockPosition, blockKey };
+      break;
     }
-
-    const ud = readFixtureHitUserData(hit.object);
-    if (!ud) continue;
-
-    const normal = (hit.face?.normal ?? new THREE.Vector3(0, 1, 0)).clone();
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-    normal.applyMatrix3(normalMatrix).normalize();
-
-    const blockPositionVec = new THREE.Vector3();
-    blockPositionVec.copy(hit.object.getWorldPosition(blockPositionVec));
-    const fallback: [number, number, number] = [blockPositionVec.x, blockPositionVec.y, blockPositionVec.z];
-    const blockPosition = ud.fixtureBreakPosition ?? fallback;
-    const blockKey = ud.fixturePrimaryId ?? `${blockPosition[0]}:${blockPosition[1]}:${blockPosition[2]}`;
-
-    if (isTerrainRayHitSuppressed(occupancy, blockKey)) continue;
-
-    return {
-      terrainMaterial: ud.terrainMaterial,
-      point: hit.point.clone(),
-      normal,
-      blockPosition,
-      blockKey,
-    } satisfies CenterTerrainHit;
-  }
-
-  return null;
+    caches.set(scene, { signature, occupancy, hit:result });
+    return result;
+  });
 }
 
-/** First door fixture hit along the crosshair within maxDistance, or null. */
-export function getDoorTogglePrimaryId(
-  raycaster: THREE.Raycaster,
-  camera: THREE.Camera,
-  scene: THREE.Scene,
-  maxDistance: number,
-  occupancy: TerrainOccupancySnapshot,
-): string | null {
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  const intersects = raycaster.intersectObjects(scene.children, true);
-
-  for (const hit of intersects) {
-    if (hit.distance > maxDistance) break;
-
-    const ud = readFixtureHitUserData(hit.object);
-    if (!ud?.fixturePrimaryId || ud.fixtureKind !== "door") continue;
-
-    const blockKey = ud.fixturePrimaryId;
-    if (isTerrainRayHitSuppressed(occupancy, blockKey)) continue;
-
-    return ud.fixturePrimaryId;
+/** Preserve existing behavior: first door within reach, ignoring unrelated geometry. */
+export function getDoorTogglePrimaryId(raycaster: THREE.Raycaster, camera: THREE.Camera, scene: THREE.Scene,
+  maxDistance: number, occupancy: TerrainOccupancySnapshot): string | null {
+  camera.updateWorldMatrix(true, false);
+  raycaster.setFromCamera(center, camera); raycaster.far = maxDistance;
+  const targets = getPickRegistry(scene).targets("door");
+  for (const target of targets) target.updateWorldMatrix(true, false);
+  for (const hit of raycaster.intersectObjects(targets, false)) {
+    const data = fixtureData(hit.object);
+    if (data?.fixturePrimaryId && (data.fixtureKind as FixtureKind) === "door" && !isTerrainRayHitSuppressed(occupancy, data.fixturePrimaryId)) return data.fixturePrimaryId;
   }
-
   return null;
 }
