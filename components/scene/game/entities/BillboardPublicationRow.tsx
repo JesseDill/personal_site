@@ -8,7 +8,7 @@ import {
   buildPublicationTextColorRanges,
   resolvePublicationTextLinkAtHit,
 } from "../config/publicationsBillboardCopy";
-import { AnimatedGifPlane } from "./AnimatedGifPlane";
+import { BillboardImagePlane } from "./BillboardImagePlane";
 
 export function BillboardPublicationRow() {
   const p = spawnBillboardLayout.publications;
@@ -21,13 +21,13 @@ export function BillboardPublicationRow() {
 
   return (
     <group position={p.position} rotation={[0, Math.PI, 0]}>
-      <AnimatedGifPlane
+      <BillboardImagePlane
         src={p.gif.path}
         width={p.gif.width}
         height={p.gif.height}
         position={p.gif.position}
       />
-      <AnimatedGifPlane
+      <BillboardImagePlane
         src={p.nvfGif.path}
         width={p.nvfGif.width}
         height={p.nvfGif.height}
